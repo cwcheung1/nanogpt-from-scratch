@@ -1,0 +1,9 @@
+[project]
+name = "nanogpt-from-scratch"
+version = "0.1.0"
+description = "Building a GPT from scratch (Karpathy nanoGPT-style) to learn LLM pretraining mechanics"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=2.4.6",
+    "torch>=2.12.1",
+]
