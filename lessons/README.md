@@ -6,6 +6,14 @@ each lesson is a runnable script plus a writeup that ties the code to the
 underlying concept. Work through in order; each stage's code and results are
 compared directly against the previous stage's.
 
+**Start with [00 — Roadmap](00-roadmap.md) first**, even before lesson 1. It
+explains what we're actually building, defines every recurring term
+(embedding, logits, loss, batch/block size, etc.) in one place, and walks
+through why each of the 6 lessons exists — what specific gap in the previous
+lesson it's fixing. The lessons below assume you've read it and don't
+re-explain those terms from scratch.
+
+0. [Roadmap](00-roadmap.md) — the big picture, read this first.
 1. [Tokenization & data prep](01-tokenization-and-data.md) — char-level
    tokenizer, train/val split, the `get_batch()` function every later lesson
    reuses.

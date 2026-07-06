@@ -1,10 +1,12 @@
 """Lesson 05: the transformer block.
 
-Wrap multi-head attention with a feedforward MLP, residual ("skip")
-connections, and pre-LayerNorm, then stack several of these blocks. Includes
-a deliberate ablation: the same architecture trained WITH and WITHOUT
-residual connections, to empirically show why they matter rather than just
-asserting it.
+Wrap multi-head attention (unchanged from lesson 4) with a feedforward MLP,
+residual ("skip") connections, and pre-LayerNorm, then stack several of
+these blocks. Includes a deliberate ablation: the same architecture trained
+WITH and WITHOUT residual connections, to empirically show why they matter
+rather than just asserting it. "Residual" and "LayerNorm" are defined in
+plain language in lessons/05-transformer-block.md — read that first if
+either term is new.
 """
 import torch
 import torch.nn as nn
@@ -26,6 +28,9 @@ learning_rate = 1e-3
 
 
 class Head(nn.Module):
+    """Unchanged from lessons 3/4 — see 03_self_attention.py for the full
+    query/key/value/scaled-dot-product/causal-mask explanation."""
+
     def __init__(self, head_size):
         super().__init__()
         self.key = nn.Linear(n_embd, head_size, bias=False)
@@ -43,6 +48,9 @@ class Head(nn.Module):
 
 
 class MultiHeadAttention(nn.Module):
+    """Unchanged from lesson 4 — several Head instances in parallel,
+    concatenated, then linearly projected back to n_embd width."""
+
     def __init__(self, num_heads, head_size):
         super().__init__()
         self.heads = nn.ModuleList([Head(head_size) for _ in range(num_heads)])
@@ -54,12 +62,19 @@ class MultiHeadAttention(nn.Module):
 
 
 class FeedForward(nn.Module):
-    """Per-position MLP: attention is how tokens exchange information with
-    each other; the feedforward is where the model actually 'thinks' about
-    what it gathered, independently at each position. The 4x expansion
-    (n_embd -> 4*n_embd -> n_embd) matches the original Transformer paper and
-    GPT-2 — more capacity to compute in, projected back down to stay
-    residual-stream-compatible."""
+    """NEW in this lesson. Per-position MLP: attention (above) is how
+    positions exchange information WITH EACH OTHER; this is where the model
+    actually 'thinks' about what it just gathered, independently at each
+    position (no information crosses between positions here — every
+    position runs through this same small network on its own).
+    Linear -> ReLU -> Linear: the first Linear expands each position's
+    n_embd-wide vector out to 4x as many numbers (more room to compute
+    with), ReLU (a simple nonlinearity: replace every negative number with
+    0, leave positive numbers unchanged) lets the network represent
+    non-straight-line relationships instead of just weighted sums, and the
+    second Linear projects back down to n_embd so the output can be added
+    back onto the residual stream (see Block below). The 4x expand-then-
+    contract shape matches the original Transformer paper and GPT-2."""
 
     def __init__(self, n_embd):
         super().__init__()
@@ -74,40 +89,54 @@ class FeedForward(nn.Module):
 
 
 class Block(nn.Module):
-    """One transformer block: communicate (attention), then compute (MLP),
-    each wrapped in a residual connection and preceded by LayerNorm
-    (pre-norm, matching GPT-2 — the original 2017 Transformer paper used
-    post-norm, but pre-norm trains more stably at depth, which is why every
-    modern LLM uses it)."""
+    """One transformer block: communicate (attention) then compute (MLP),
+    each wrapped in a residual connection and preceded by LayerNorm.
+    "Pre-norm" means LayerNorm runs BEFORE attention/feedforward, not after
+    — the original 2017 "Attention Is All You Need" paper used post-norm,
+    but pre-norm trains more stably at depth, which is why GPT-2 and every
+    modern LLM uses it instead."""
 
     def __init__(self, n_embd, n_head, use_residual=True):
         super().__init__()
         head_size = n_embd // n_head
         self.sa = MultiHeadAttention(n_head, head_size)
         self.ffwd = FeedForward(n_embd)
-        self.ln1 = nn.LayerNorm(n_embd)
-        self.ln2 = nn.LayerNorm(n_embd)
+        self.ln1 = nn.LayerNorm(n_embd)  # normalizes before attention
+        self.ln2 = nn.LayerNorm(n_embd)  # normalizes before the MLP
         self.use_residual = use_residual
 
     def forward(self, x):
         if self.use_residual:
+            # x + self.sa(...): the ORIGINAL x survives untouched, with the
+            # attention output added on top — not replaced by it. Same
+            # pattern for the feedforward step. See the lesson doc for why
+            # this "+x" matters for training something this deep.
             x = x + self.sa(self.ln1(x))
             x = x + self.ffwd(self.ln2(x))
         else:
-            # ablation: no skip connection — each block's output REPLACES
-            # its input instead of adding to it. Gradients must flow back
-            # through every block's transformation with nothing to skip
-            # through, which gets harder as depth (n_layer) increases.
+            # THE ABLATION: no skip connection — each step's output
+            # REPLACES x instead of adding to it. Everything else (weights
+            # init, seed, hyperparameters, training loop) is identical to
+            # the WITH-residual path above; this is the ONLY thing that
+            # changes. Watch the results table in the lesson doc for what
+            # this one change does to val loss.
             x = self.sa(self.ln1(x))
             x = self.ffwd(self.ln2(x))
         return x
 
 
 class GPTLanguageModel(nn.Module):
+    """Same token+position embedding setup as lesson 4, but now the middle
+    of the model is n_layer stacked Blocks (this is where "depth" comes
+    from) instead of a single attention layer, plus one final LayerNorm
+    (ln_f) before the output head."""
+
     def __init__(self, use_residual=True):
         super().__init__()
         self.token_embedding_table = nn.Embedding(vocab_size, n_embd)
         self.position_embedding_table = nn.Embedding(block_size, n_embd)
+        # n_layer=4 separate Block instances, chained one after another —
+        # nn.Sequential just means "run x through each of these in order."
         self.blocks = nn.Sequential(
             *[Block(n_embd, n_head, use_residual=use_residual) for _ in range(n_layer)]
         )
@@ -142,6 +171,10 @@ class GPTLanguageModel(nn.Module):
 
 
 def train(use_residual, label):
+    """Run the standard training loop (see roadmap glossary) for one model
+    variant, printing train/val loss periodically. Called twice below with
+    use_residual=True and False — same seed both times, so the only thing
+    that can explain a difference in results is that one flag."""
     torch.manual_seed(1337)
     model = GPTLanguageModel(use_residual=use_residual).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)

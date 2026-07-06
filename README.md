@@ -21,9 +21,12 @@ RTX 4070 SUPER, 12GB VRAM). Runs on CPU too, just much slower.
 
 ## Working through it
 
-Start at [`lessons/README.md`](lessons/README.md) — it indexes all 6
-lessons in order. Each lesson is a `lessons/NN-concept-name.md` writeup plus
-a runnable script in `lessons/code/`:
+Start at [`lessons/00-roadmap.md`](lessons/00-roadmap.md) — the big picture
+before the weeds: what we're actually building, every recurring term
+(embedding, logits, loss, batch/block size, etc.) defined once, and why each
+of the 6 lessons exists. Then [`lessons/README.md`](lessons/README.md)
+indexes all 6 lessons in order. Each lesson is a `lessons/NN-concept-name.md`
+writeup plus a heavily-commented, runnable script in `lessons/code/`:
 
 ```
 make lesson1    # tokenization & data prep

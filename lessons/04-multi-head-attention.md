@@ -1,11 +1,17 @@
 # 04 — Multi-Head Attention
 
+*Before this lesson: [00 — Roadmap](00-roadmap.md) and lesson 3 (this
+reuses lesson 3's `Head` unchanged — if query/key/value or the causal mask
+are still fuzzy, that's the lesson to revisit, not this one).*
+
 **Concept**: run several small attention heads in parallel instead of one
 big one, concatenate their outputs, and project back down — same total
 compute budget, but able to represent several distinct kinds of
 relationships (e.g. "what's the previous vowel," "what character started
 this word") at once instead of one averaged-together pattern. This lesson
-also plugs attention into a real trainable model for the first time.
+also plugs attention into a real trainable model for the first time — the
+first time in this series you'll see attention's val loss number, and the
+first real comparison point against lesson 2's bigram score.
 
 **Analogy**: one attention head is one person in the discussion from lesson
 3's analogy, asking one kind of question. Multi-head is convening several
@@ -22,13 +28,20 @@ findings into one summary.
   costs no extra parameters over one 32-wide head, it just restructures the
   same budget into 4 independent "conversations."
 - **Position embeddings, introduced here for the first time**: attention has
-  no built-in sense of sequence order — `q @ k.T` treats the input as a *set*
-  of tokens, not a *sequence*. `self.position_embedding_table(torch.arange(T))`
-  gives each position 0..T-1 its own learned vector, added directly to the
-  token embedding (`x = tok_emb + pos_emb`). This is the mechanism that lets
-  the model tell "cat sat" from "sat cat" apart. (GPT-2/nanoGPT use this
-  same additive learned-position-embedding scheme; rotary/ALiBi are
-  alternatives you'll meet in production models, not covered here.)
+  no built-in sense of sequence order. Concretely: the dot product `q @ k.T`
+  that scores "how relevant is position j to position i" only looks at the
+  *content* of each position's vector — it has no idea whether j came right
+  before i or 5 characters earlier, only that it comes at-or-before i (via
+  the causal mask). Feed it the characters of "cat sat" vs. "sat cat" *in
+  whatever order, unlabeled* and attention alone can't tell them apart — it
+  only sees "a `c`, an `a`, a `t`, a ` `, an `s`... available to attend to,"
+  not their positions. Fix: `self.position_embedding_table(torch.arange(T))`
+  gives each position 0..T-1 its own learned vector purely for "this is
+  where I sit in the sequence," added directly to the token embedding
+  (`x = tok_emb + pos_emb`) so every position's vector now encodes *both*
+  "which character am I" and "where am I." (GPT-2/nanoGPT use this same
+  additive learned-position-embedding scheme; rotary/ALiBi are alternatives
+  you'll meet in production models, not covered here.)
 - `generate` now slices `idx[:, -block_size:]` before each forward pass —
   the bigram model in lesson 2 could ignore this because it only ever used
   the last token regardless of how much history you fed it, but an

@@ -1,11 +1,44 @@
 # 06 — Full GPT, Training Loop, and Sampling
 
+*Before this lesson: [00 — Roadmap](00-roadmap.md) and lesson 5 — the
+architecture here (`Block`, `GPTLanguageModel`) is IDENTICAL to lesson 5's,
+just scaled up and with 3 new training-stability additions, each defined
+below before use.*
+
 **Concept**: assemble everything from lessons 1-5 into the actual
 nanoGPT-tutorial configuration (10.8M params: 6 layers, 6 heads, 384-dim
 embeddings, 256-token context), add the regularization/stability details a
 real training run needs (dropout, gradient clipping, GPT-2-style init), and
 run it long enough to see both a good result *and* a real failure mode
-(overfitting) show up in the loss curve.
+(overfitting, defined in the roadmap glossary) show up in the loss curve.
+
+**Three new terms, defined before you hit them in the code:**
+- **Dropout**: during training only, randomly pick some fraction of values
+  (here 20%, `p=0.2`) in a layer's output and force them to exactly 0 for
+  that one forward pass, picking a different random subset each time. This
+  sounds destructive, but the point is exactly that: it prevents the model
+  from getting overly reliant on any one specific attention weight or MLP
+  unit always being available, which is a direct defense against
+  overfitting (the model can't memorize "unit #47 always fires for this
+  exact training sentence" if unit #47 randomly vanishes 20% of the time).
+  Dropout is automatically switched off during generation/evaluation — it's
+  purely a training-time regularizer.
+- **Gradient clipping**: recall from the roadmap glossary that
+  `loss.backward()` computes a gradient (a "which direction helps" nudge)
+  for every parameter. Occasionally, one unusually extreme training batch
+  can produce a gradient so large that the resulting weight update
+  overshoots badly and destabilizes training. Gradient clipping caps the
+  total size of that gradient update before it's applied — if it's under
+  the cap, nothing changes; if it's over, it gets scaled down to the cap.
+  Cheap insurance against rare, destabilizing updates at this scale and up.
+- **GPT-2-style weight initialization**: before training starts, every
+  layer's weights need *some* starting values (they can't start at exactly
+  0, or the model would have no way to distinguish anything). This project
+  initializes them as small random numbers from a normal (bell-curve)
+  distribution centered at 0 with a small spread (`std=0.02`), matching
+  GPT-2's own scheme. Not load-bearing at this small a scale — this model
+  would likely train fine with PyTorch's own default init too — but worth
+  having as muscle memory since it's what real GPT-style models use.
 
 **Analogy**: lessons 2-5 were building and testing a car's components one
 at a time in a garage — engine, transmission, brakes, all bench-tested

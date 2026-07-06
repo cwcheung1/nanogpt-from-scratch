@@ -1,10 +1,35 @@
 # 05 — The Transformer Block
 
+*Before this lesson: [00 — Roadmap](00-roadmap.md) and lesson 4 — this
+reuses lesson 4's `Head`/`MultiHeadAttention` unchanged, and adds 3 new
+ideas on top: a per-position MLP, residual connections, and LayerNorm, all
+defined in plain language below before they're used.*
+
 **Concept**: a transformer block is "communicate, then compute" —
-multi-head attention lets tokens exchange information, a per-position MLP
-lets the model process what it gathered — and both are wrapped in residual
-("skip") connections and preceded by LayerNorm so you can stack many of
-these blocks without training collapsing.
+multi-head attention (lesson 4, unchanged) lets positions exchange
+information with each other, then a per-position MLP ("multi-layer
+perceptron" — just a small stack of learned layers, here 2 `nn.Linear`
+layers with a nonlinearity between them) lets the model actually process
+what it just gathered. Both steps are wrapped in a **residual ("skip")
+connection** and preceded by **LayerNorm**, two stability tricks defined
+below that make it possible to stack many of these blocks deep without
+training falling apart.
+
+**Two new terms, defined before you hit them in the code:**
+- **Residual / skip connection**: instead of `x = f(x)` (replace the input
+  entirely with the transformation's output), do `x = x + f(x)` (add the
+  transformation's output ON TOP of the original input). The original
+  information always survives untouched, in addition to whatever new thing
+  this step computed — nothing is ever fully overwritten. Why this matters
+  for training specifically is explained below, and demonstrated with a
+  real side-by-side experiment, not just asserted.
+- **LayerNorm**: a fixed (non-learned-in-the-interesting-sense) rescaling
+  step, applied to every position's vector independently, that shifts and
+  scales its numbers to have a consistent mean (~0) and spread (~1) before
+  they're fed into the next computation. Think of it as "regardless of how
+  large or small the numbers flowing through the network have gotten by
+  this point, renormalize them to a consistent, well-behaved range before
+  the next step" — a stability measure, not a source of new information.
 
 **Analogy**: think of each block as one round of a group work session:
 first everyone shares relevant info with each other (attention), then
@@ -28,10 +53,20 @@ mangled before it reaches the end.
     depth, and every modern LLM (including, as far as public architecture
     descriptions go, Claude) follows suit.
   - **Residual = `x + f(x)`, not `x = f(x)`**: the input skips around the
-    transformation and gets added back. This gives gradients a direct path
-    backward through addition (`d/dx (x + f(x)) = 1 + f'(x)`) instead of
-    having to flow through every block's full transformation with nothing
-    to fall back on.
+    transformation and gets added back. Recall from the roadmap glossary
+    that training's "backward pass" works out, for every parameter, "which
+    direction would reduce the loss" by working backward through the
+    network one step at a time. With plain `x = f(x)` stacked 4 (or 40)
+    deep, that backward signal has to pass through every single
+    transformation in the stack, and can shrink toward nothing or blow up
+    along the way — the deeper the stack, the worse this gets. Addition
+    (`x + f(x)`) gives that backward signal a second, untransformed path
+    straight through every block, in parallel with the path through `f(x)`
+    — so even if the `f(x)` path degrades, the signal still gets through via
+    the `+x` path. (For the calculus-inclined: `d/dx (x + f(x)) = 1 + f'(x)`
+    — that `+1` is exactly the guaranteed direct path. You don't need to be
+    able to derive this to use it; the ablation below shows the effect
+    directly, without any calculus.)
 - `GPTLanguageModel` stacks `n_layer=4` blocks via `nn.Sequential`, then one
   final `ln_f` before the output head — same token+position embedding setup
   as lesson 4.

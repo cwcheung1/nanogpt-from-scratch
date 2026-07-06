@@ -1,17 +1,55 @@
 # 03 — Self-Attention Mechanics
 
-**Concept**: self-attention lets each position in a sequence pull
-information from every earlier position, weighted by a *learned*
-relevance score — instead of the bigram model's "only the immediately
-previous token" or a naive "equal-weight average of everyone before me."
+*Before this lesson: [00 — Roadmap](00-roadmap.md) and lesson 2. This is
+the densest lesson in the series conceptually — expect to reread it. There
+is no trained model in this lesson; we're only building and inspecting the
+mechanism, on random data, so training details can't distract from what
+attention itself actually computes.*
 
-**Analogy**: picture a group discussion where, before speaking, each person
-silently asks "who here said something relevant to what I need?" (query),
-everyone else holds up a sign summarizing what they said (key), the person
-compares their question against every sign to get relevance scores, and
-gathers a weighted blend of what those people *actually meant to share*
-(value) — not their sign, but their real message. Query/key decide *how
-much* to listen to whom; value is *what* gets passed along.
+**Concept, in one sentence**: for every position in a sequence, look at
+every *earlier* position, decide how much each one matters *right now*
+(a "relevance score" the model learns), and blend them together weighted
+by those scores. That's it — that whole sentence is what "self-attention"
+means. It's a strict upgrade over lesson 2's bigram, which could only ever
+look at exactly 1 character back with a fixed, non-learned rule.
+
+**The mechanical version, first — no analogy yet**: each position produces
+3 vectors (via 3 separate learned linear layers — see roadmap glossary on
+`nn.Linear`) called query, key, and value. "Relevance score between
+position A and position B" = a dot product of A's query vector with B's key
+vector (dot product is just "how aligned are two vectors" — two vectors
+pointing the same direction score high, two pointing in unrelated
+directions score near 0). Turn all those raw scores into real probabilities
+with softmax (every row now sums to exactly 1), then use those
+probabilities as weights to take a weighted average of everyone's value
+vectors. Query/key decide the *weights* (how much to listen to each
+position); value is *what gets averaged*. That's the entire mechanism —
+everything else below is either terminology for a piece of it, or code that
+implements it.
+
+One term that comes up a lot below: a **lower-triangular matrix** is just a
+square grid of numbers where everything *above* the diagonal (top-left to
+bottom-right) is zero, and everything on/below it can be non-zero. Visually,
+for a 4×4 example (`1`s below/on the diagonal, `0`s above):
+```
+1 0 0 0
+1 1 0 0
+1 1 1 0
+1 1 1 1
+```
+Row *i* has non-zero entries only in columns `0..i` — which is exactly
+"positions I'm allowed to look at: myself and everything before me, nothing
+after." That shape is why this matrix keeps showing up: it's a compact way
+to say "no cheating by looking at the future" in matrix form.
+
+**If an analogy helps**: picture a group discussion where, before speaking,
+each person silently asks "who here said something relevant to what I
+need?" (their query), everyone else holds up a sign summarizing what they
+said (their key), the person compares their question against every sign to
+get relevance scores (this is the dot-product step above), and gathers a
+weighted blend of what those people *actually meant to share* (their
+value) — not the sign, the real message. Query/key decide *how much* to
+listen to whom; value is *what* gets passed along.
 
 **How it works** (`lessons/code/03_self_attention.py`):
 - **Part A — "the trick"**: three functions that compute the *identical*

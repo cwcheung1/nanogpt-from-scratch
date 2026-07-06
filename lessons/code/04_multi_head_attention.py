@@ -1,9 +1,11 @@
-"""Lesson 04: multi-head attention.
+"""Lesson 04: multi-head attention — the first TRAINED attention model.
 
-Wire lesson 3's single Head into several heads running in parallel, and for
-the first time plug attention into an actual trainable language model (with
-position embeddings, since attention itself has no notion of order) so we
-can compare its loss against lesson 2's bigram baseline.
+Wire lesson 3's single Head (unchanged — see that file for the detailed
+query/key/value/masking comments) into several heads running in parallel,
+and for the first time plug attention into an actual trainable language
+model, with position embeddings added (since attention itself has no notion
+of order — see the lesson doc). This is the first head-to-head loss
+comparison against lesson 2's bigram baseline.
 """
 import torch
 import torch.nn as nn
@@ -14,16 +16,21 @@ from common import vocab_size, get_batch, estimate_loss, decode
 torch.manual_seed(1337)
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
-block_size = 8
+block_size = 8    # context length — see lesson 1 / roadmap
 batch_size = 32
-n_embd = 32
-n_head = 4
+n_embd = 32       # width of every position's embedding vector
+n_head = 4        # how many attention heads run in parallel (see MultiHeadAttention)
 max_iters = 3000
 eval_interval = 300
 learning_rate = 1e-3
 
 
 class Head(nn.Module):
+    """Identical to lesson 3's Head class — same query/key/value projections,
+    same scaled dot product, same causal mask. See lessons/code/
+    03_self_attention.py for the full line-by-line explanation; nothing
+    about the mechanism itself changed, it's just being trained now."""
+
     def __init__(self, head_size):
         super().__init__()
         self.key = nn.Linear(n_embd, head_size, bias=False)
@@ -41,12 +48,18 @@ class Head(nn.Module):
 
 
 class MultiHeadAttention(nn.Module):
-    """Several independent attention heads in parallel, each looking for
-    different kinds of relationships, then concatenated and linearly
-    projected back to n_embd. Splitting one big head into several small ones
-    (head_size = n_embd // n_head) costs nothing extra in parameters — it's
-    the same total width, just able to represent several distinct attention
-    patterns simultaneously instead of one averaged pattern."""
+    """Several independent Head instances run in parallel — each learns its
+    own query/key/value projections, so each can specialize in noticing a
+    different kind of relationship between positions. Their outputs are
+    glued together (torch.cat along the last dimension) and passed through
+    one more nn.Linear ("proj") that mixes/blends the heads' separate
+    findings back into one n_embd-wide vector per position.
+
+    head_size = n_embd // n_head (set by the caller below) means: split one
+    32-wide embedding into 4 heads of size 8 each. Concatenating 4 heads of
+    size 8 gets back to width 32 — the SAME total parameter budget as one
+    32-wide head, just restructured into 4 independent, smaller
+    "conversations" instead of one big one."""
 
     def __init__(self, num_heads, head_size):
         super().__init__()
@@ -62,21 +75,27 @@ class MultiHeadLanguageModel(nn.Module):
     def __init__(self):
         super().__init__()
         self.token_embedding_table = nn.Embedding(vocab_size, n_embd)
-        # attention has no built-in sense of position (unlike an RNN's
-        # recurrence) — without this, "cat sat" and "sat cat" would produce
-        # identical attention patterns. A learned vector per position, added
-        # to the token embedding, is how the model recovers order.
+        # Attention has no built-in sense of position — the query/key dot
+        # product only sees each position's CONTENT, not where it sits in
+        # the sequence (see the lesson doc's "cat sat" vs "sat cat"
+        # example). This table gives each position 0..block_size-1 its own
+        # learned vector purely encoding "where am I," independent of
+        # what character is there.
         self.position_embedding_table = nn.Embedding(block_size, n_embd)
         self.sa_heads = MultiHeadAttention(n_head, n_embd // n_head)
-        self.lm_head = nn.Linear(n_embd, vocab_size)
+        self.lm_head = nn.Linear(n_embd, vocab_size)  # projects back to per-character logits
 
     def forward(self, idx, targets=None):
         B, T = idx.shape
-        tok_emb = self.token_embedding_table(idx)  # (B, T, n_embd)
-        pos_emb = self.position_embedding_table(torch.arange(T, device=idx.device))  # (T, n_embd)
-        x = tok_emb + pos_emb  # (B, T, n_embd), broadcast over batch
-        x = self.sa_heads(x)
-        logits = self.lm_head(x)  # (B, T, vocab_size)
+        tok_emb = self.token_embedding_table(idx)  # (B, T, n_embd) — "what character is here"
+        pos_emb = self.position_embedding_table(torch.arange(T, device=idx.device))  # (T, n_embd) — "where is here"
+        # Add the two together: every position's vector now encodes BOTH
+        # "which character" and "which position" simultaneously. pos_emb
+        # (shape (T, n_embd)) broadcasts across the batch dimension — the
+        # same position-vectors apply to every sequence in the batch.
+        x = tok_emb + pos_emb  # (B, T, n_embd)
+        x = self.sa_heads(x)  # let positions exchange information via attention
+        logits = self.lm_head(x)  # (B, T, vocab_size) — back to per-character scores
 
         if targets is None:
             loss = None
@@ -87,7 +106,16 @@ class MultiHeadLanguageModel(nn.Module):
 
     def generate(self, idx, max_new_tokens):
         for _ in range(max_new_tokens):
-            idx_cond = idx[:, -block_size:]  # attention needs a fixed-size window now
+            # NEW vs. lesson 2: crop to the last block_size characters
+            # before every forward pass. The bigram model could ignore this
+            # because it only ever used the very last token regardless of
+            # how much history you handed it. This model's
+            # position_embedding_table only HAS block_size rows (positions
+            # 0..block_size-1) — feed it a longer sequence and there's no
+            # position embedding to look up for the extra positions. This is
+            # your first hard "context window" limit, not just a training
+            # convenience.
+            idx_cond = idx[:, -block_size:]
             logits, _ = self(idx_cond)
             logits = logits[:, -1, :]
             probs = F.softmax(logits, dim=-1)

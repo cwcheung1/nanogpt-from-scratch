@@ -1,39 +1,53 @@
 # 02 — Bigram Baseline Model
 
-**Concept**: the simplest possible neural language model predicts the next
-character using *only* the current character, via one learned lookup table
-— no attention, no hidden layers, no context beyond a single token.
+*Before this lesson: read [00 — Roadmap](00-roadmap.md) if you haven't —
+this lesson assumes you already know what "loss", "embedding", "logits",
+and "the training loop" mean, and won't re-explain them.*
 
-**Analogy**: imagine a giant 65x65 table where row *i* is "if the current
+**Concept**: the first actual model in this repo (lesson 1 had none). The
+simplest possible neural language model predicts the next character using
+*only* the single character right before it — no attention, no hidden
+layers, no memory of anything further back. This is the floor: every later
+lesson's whole point is beating this number.
+
+**Analogy**: imagine a giant 65×65 table where row *i* is "if the current
 character is `i`, here's how likely every other character is to come next."
-That table, learned from data, is the entire model. It's the "always guess
-the most common follow-up letter" strategy, made probabilistic and trainable.
+That table, learned from data, is the *entire* model — there's nothing else
+to it. It's the "always guess the most common follow-up letter" strategy,
+made probabilistic and trainable.
 
-**How it works** (`lessons/code/02_bigram_baseline.py`):
-- `nn.Embedding(vocab_size, vocab_size)` — normally an embedding table maps
-  token id -> a dense vector. Here the output dimension is *also*
-  `vocab_size`, so each row directly **is** the logits over "what comes
-  next." There's no separate output projection because the embedding table
-  doubles as one.
-- `forward` reshapes `(B, T, C)` -> `(B*T, C)` before `F.cross_entropy`,
-  because PyTorch's cross entropy wants one prediction-vs-target pair per
-  row, and we have `B*T` independent next-character predictions per batch
-  (this is the "8 training signals per row" idea from lesson 1, now actually
-  consumed by a loss function).
-- `generate` calls the model repeatedly, taking `softmax` over the logits
-  for the *last* position and sampling one character via
-  `torch.multinomial` (not `argmax` — sampling keeps output varied instead
-  of deterministically repeating the single most likely character forever).
-  Note the comment in the code: this model recomputes the whole sequence
-  every step but only ever looks at the last token anyway, because a bigram
-  model has no mechanism to use earlier context even if you gave it some.
-  That wastefulness becomes relevant later — it's exactly what KV-caching in
-  real inference serving fixes, once the model actually has multi-token
-  context worth reusing.
-- `estimate_loss` (in `common.py`) averages loss over 200 random batches
-  instead of trusting one batch's loss, which is noisy. Watch both `train`
-  and `val` loss printed side by side — this is your first look at
-  over/underfitting diagnostics.
+**How it works** (`lessons/code/02_bigram_baseline.py`, now heavily
+commented — read the comments alongside this):
+- `nn.Embedding(vocab_size, vocab_size)` — an embedding (see roadmap
+  glossary) normally maps a token id to a learned vector of some other size.
+  Here the output size is *also* `vocab_size`, so each row of the table
+  directly **is** the logits for "what comes next" — there's no separate
+  output layer, because this one lookup table doubles as the whole model.
+- `forward` reshapes the `(B, T, C)` logits tensor into `(B*T, C)` before
+  computing the loss, because PyTorch's `F.cross_entropy` wants one
+  prediction-vs-answer pair per row, and we have `B*T` independent
+  next-character predictions in one batch (this is lesson 1's "one 8-char
+  window secretly gives 8 flashcards" idea, now actually being scored by a
+  loss function for the first time).
+- `generate` calls the model repeatedly: get logits for the last position →
+  `softmax` turns them into real probabilities → `torch.multinomial` picks
+  one character *randomly, weighted by those probabilities* (not the single
+  most-likely character every time — that would repeat forever; sampling
+  keeps output varied) → glue it onto the sequence → repeat. This is
+  literally the "ask the model, sample, repeat" loop from the roadmap's
+  "what is a language model" section, running for real.
+  One inefficiency worth clocking now because it becomes relevant later:
+  `generate` re-runs the *entire* sequence through the model at every single
+  step, even though a bigram model only ever looks at the last character
+  regardless of how much history you hand it. That wasted recomputation is
+  exactly what KV-caching (a real inference-serving optimization, not
+  covered in this repo) exists to eliminate — once a model actually has
+  multi-character context worth reusing, which this one doesn't yet.
+- `estimate_loss` (in `common.py`) averages the loss over 200 random
+  batches instead of trusting a single batch's loss, which jumps around too
+  much to read reliably. Watch `train` and `val` loss printed side by side —
+  this is your first live look at the over/underfitting check from the
+  roadmap glossary.
 
 **Look at**: `lessons/code/02_bigram_baseline.py`, `estimate_loss` in
 `lessons/code/common.py`

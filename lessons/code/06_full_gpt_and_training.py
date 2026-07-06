@@ -1,10 +1,13 @@
 """Lesson 06: the full GPT, scaled up, trained properly, and sampled from.
 
-Same architecture as lesson 5's Block/GPTLanguageModel, but: bigger
-(n_embd=384, n_head=6, n_layer=6, block_size=256), with dropout for
-regularization, gradient-clipped AdamW with the config nanoGPT/GPT-2 use,
-and a real training run long enough to produce recognizably
-Shakespeare-*shaped* (not coherent, but structurally plausible) text.
+Same architecture as lesson 5's Block/GPTLanguageModel (unchanged
+attention/MLP/residual/pre-LN pattern), but: bigger (n_embd=384, n_head=6,
+n_layer=6, block_size=256), with dropout for regularization, gradient-
+clipped AdamW with the config nanoGPT/GPT-2 use, and a real training run
+long enough to produce recognizably Shakespeare-*shaped* (not coherent, but
+structurally plausible) text. "Dropout", "gradient clipping", and "GPT-2-
+style init" are defined in plain language in
+lessons/06-full-gpt-and-training.md — read that first if any is new.
 """
 import os
 import time
@@ -33,6 +36,10 @@ grad_clip = 1.0
 
 
 class Head(nn.Module):
+    """Same query/key/value/scaled-dot-product/causal-mask mechanism as
+    lessons 3-5 (see 03_self_attention.py for the full explanation) — the
+    only addition is a Dropout applied to the attention weights themselves."""
+
     def __init__(self, head_size):
         super().__init__()
         self.key = nn.Linear(n_embd, head_size, bias=False)
@@ -47,11 +54,18 @@ class Head(nn.Module):
         wei = q @ k.transpose(-2, -1) * k.shape[-1] ** -0.5
         wei = wei.masked_fill(self.tril[:T, :T] == 0, float("-inf"))
         wei = F.softmax(wei, dim=-1)
-        wei = self.dropout(wei)  # randomly zero some attention weights during training,
-        return wei @ v  # so the model can't over-rely on any single position's signal
+        # NEW vs. lesson 5: randomly zero some attention weights during
+        # training (see lesson doc for what dropout is/why) — this fires
+        # AFTER softmax, so the zeroed-out weights simply stop contributing
+        # to the weighted average of values below, for this one forward pass.
+        wei = self.dropout(wei)
+        return wei @ v
 
 
 class MultiHeadAttention(nn.Module):
+    """Same as lesson 4/5's MultiHeadAttention, plus a Dropout on the final
+    projection's output."""
+
     def __init__(self, num_heads, head_size):
         super().__init__()
         self.heads = nn.ModuleList([Head(head_size) for _ in range(num_heads)])
@@ -64,6 +78,9 @@ class MultiHeadAttention(nn.Module):
 
 
 class FeedForward(nn.Module):
+    """Same Linear -> ReLU -> Linear as lesson 5 (see that file for the full
+    explanation), plus a Dropout after the second Linear."""
+
     def __init__(self, n_embd):
         super().__init__()
         self.net = nn.Sequential(
@@ -78,6 +95,10 @@ class FeedForward(nn.Module):
 
 
 class Block(nn.Module):
+    """Identical to lesson 5's Block WITH residuals (the ablation's
+    use_residual=False path is gone here — this lesson is about scaling up
+    the version that works, not re-running the ablation)."""
+
     def __init__(self, n_embd, n_head):
         super().__init__()
         head_size = n_embd // n_head
@@ -93,6 +114,11 @@ class Block(nn.Module):
 
 
 class GPTLanguageModel(nn.Module):
+    """Identical structure to lesson 5's GPTLanguageModel — token+position
+    embeddings, n_layer stacked Blocks, final LayerNorm, output head — plus
+    an explicit weight-initialization step (_init_weights, below) that
+    lesson 5 left at PyTorch's defaults."""
+
     def __init__(self):
         super().__init__()
         self.token_embedding_table = nn.Embedding(vocab_size, n_embd)
@@ -100,11 +126,19 @@ class GPTLanguageModel(nn.Module):
         self.blocks = nn.Sequential(*[Block(n_embd, n_head) for _ in range(n_layer)])
         self.ln_f = nn.LayerNorm(n_embd)
         self.lm_head = nn.Linear(n_embd, vocab_size)
+        # self.apply(fn) calls fn once on every submodule in this model —
+        # the mechanism that lets _init_weights below reach every Linear and
+        # Embedding layer, no matter how deeply nested, without manually
+        # listing them all out.
         self.apply(self._init_weights)
 
     def _init_weights(self, module):
-        # GPT-2's init scheme: small std normal, zero bias — not load-bearing
-        # for this small a model, but standard practice worth knowing.
+        """GPT-2's init scheme (see lesson doc): every Linear/Embedding's
+        weights start as small random values from a mean-0, std-0.02 normal
+        (bell-curve) distribution, and every Linear's bias starts at exactly
+        0. Not load-bearing for a model this small — PyTorch's own default
+        init would likely train fine too — but this is the actual scheme
+        GPT-2/nanoGPT use, worth having as muscle memory."""
         if isinstance(module, nn.Linear):
             nn.init.normal_(module.weight, mean=0.0, std=0.02)
             if module.bias is not None:
@@ -128,7 +162,7 @@ class GPTLanguageModel(nn.Module):
             loss = F.cross_entropy(logits.view(B * T, C), targets.view(B * T))
         return logits, loss
 
-    @torch.no_grad()
+    @torch.no_grad()  # generation doesn't need gradients — no training happening here
     def generate(self, idx, max_new_tokens):
         for _ in range(max_new_tokens):
             idx_cond = idx[:, -block_size:]
@@ -159,6 +193,10 @@ if __name__ == "__main__":
         _, loss = model(xb, yb)
         optimizer.zero_grad(set_to_none=True)
         loss.backward()
+        # NEW vs. lesson 5: cap the overall size of this step's gradients
+        # before applying them (see lesson doc for what/why) — cheap
+        # insurance against one unusually extreme batch destabilizing
+        # training at this scale.
         torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
         optimizer.step()
 
