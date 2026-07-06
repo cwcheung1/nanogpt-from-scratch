@@ -5,6 +5,17 @@ reuses lesson 4's `Head`/`MultiHeadAttention` unchanged, and adds 3 new
 ideas on top: a per-position MLP, residual connections, and LayerNorm, all
 defined in plain language below before they're used.*
 
+**Jargon buster — new terms this lesson's code uses**:
+- **`nn.Sequential(layer1, layer2, ...)`** — runs its input through each
+  layer in order, output of one feeding into the next; used for `FeedForward`'s
+  Linear→ReLU→Linear and for stacking the `Block`s themselves.
+- **`nn.ReLU()`** — a simple nonlinearity: replace every negative number
+  with 0, leave positive numbers unchanged. Without *some* nonlinearity
+  between the two `Linear` layers, stacking them would collapse
+  mathematically into one bigger linear layer — no added expressive power.
+- **`nn.LayerNorm(n_embd)`** — see "Two new terms" below in this lesson's
+  main text; it's defined there in full rather than repeated here.
+
 **Concept**: a transformer block is "communicate, then compute" —
 multi-head attention (lesson 4, unchanged) lets positions exchange
 information with each other, then a per-position MLP ("multi-layer

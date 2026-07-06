@@ -6,6 +6,27 @@ is no trained model in this lesson; we're only building and inspecting the
 mechanism, on random data, so training details can't distract from what
 attention itself actually computes.*
 
+**Jargon buster — new terms this lesson's code uses** (full definitions in
+the roadmap's [PyTorch/Python idioms](00-roadmap.md#pytorchpython-idioms--the-code-level-words-not-the-ml-concept-words)
+section; `nn.Module`/`super().__init__()`/`dim=-1` were already covered in
+lesson 2's jargon buster and won't be repeated here):
+- **`nn.Linear(in, out, bias=False)`** — a learned linear transformation
+  (`y = x @ W`, no `+ b` since `bias=False`); `key`/`query`/`value` are each
+  one of these.
+- **`register_buffer`** — stores a tensor as part of the model (so `.to(device)`
+  moves it to the GPU along with everything else) without treating it as a
+  learnable parameter — used here for the fixed causal mask, which never
+  changes during training.
+- **`.transpose(-2, -1)`** — swaps a tensor's last two dimensions (needed to
+  line up `q` and `k` for the matrix multiply below).
+- **`@`** — Python's matrix-multiplication operator; `q @ k.transpose(-2,-1)`
+  computes every query's dot product against every key at once.
+- **`.masked_fill(cond, value)`** — replaces every element where `cond` is
+  true with `value` (here: replace future positions with `-inf` before
+  softmax, so they become exactly 0 probability).
+- **`torch.allclose(a, b)`** — checks two tensors are equal within floating-
+  point rounding error (exact `==` is unreliable for computed floats).
+
 **Concept, in one sentence**: for every position in a sequence, look at
 every *earlier* position, decide how much each one matters *right now*
 (a "relevance score" the model learns), and blend them together weighted

@@ -204,6 +204,10 @@ if __name__ == "__main__":
     print(f"\ntotal training time: {total_time:.0f}s for {max_iters} iters")
 
     os.makedirs("checkpoints", exist_ok=True)
+    # state_dict() is a plain dict of {layer name: learned tensor} — the
+    # standard PyTorch way to save/load just the learned numbers (not the
+    # code that defines the model), so a later script could reload these
+    # exact trained weights into a freshly-constructed GPTLanguageModel.
     torch.save(model.state_dict(), "checkpoints/nanogpt_shakespeare.pt")
     print("saved checkpoints/nanogpt_shakespeare.pt")
 

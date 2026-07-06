@@ -5,6 +5,22 @@ architecture here (`Block`, `GPTLanguageModel`) is IDENTICAL to lesson 5's,
 just scaled up and with 3 new training-stability additions, each defined
 below before use.*
 
+**Jargon buster — new terms this lesson's code uses** (the "Three new
+terms" section below covers Dropout/gradient clipping/init in full — this
+just adds the remaining plain code mechanics):
+- **`model.apply(fn)`** — calls `fn` once on every submodule inside
+  `model`; used here to run `_init_weights` on every `Linear`/`Embedding`
+  in the whole network in one line.
+- **`isinstance(module, nn.Linear)`** — plain Python: "is this specific
+  submodule a `Linear` layer?" — used to apply different init rules to
+  `Linear` vs. `Embedding` layers.
+- **`@torch.no_grad()`** (decorating `generate`) — skip gradient tracking
+  for this whole function; only needed during training, and skipping it
+  during generation is faster and uses less memory.
+- **`model.state_dict()`** / **`torch.save(...)`** — `state_dict()` is a
+  plain dict of `{layer name: learned tensor}`; `torch.save` writes it to
+  disk so the trained weights can be reloaded later without retraining.
+
 **Concept**: assemble everything from lessons 1-5 into the actual
 nanoGPT-tutorial configuration (10.8M params: 6 layers, 6 heads, 384-dim
 embeddings, 256-token context), add the regularization/stability details a

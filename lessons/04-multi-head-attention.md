@@ -4,6 +4,16 @@
 reuses lesson 3's `Head` unchanged — if query/key/value or the causal mask
 are still fuzzy, that's the lesson to revisit, not this one).*
 
+**Jargon buster — new terms this lesson's code uses**:
+- **`nn.ModuleList([...])`** — a Python list of layers that PyTorch still
+  recognizes as part of the model (a plain Python list wouldn't register
+  its contents' parameters) — holds the independent attention heads.
+- **`torch.cat([...], dim=-1)`** — glues several tensors together along the
+  given dimension; here, concatenates each head's output side by side.
+- **`torch.arange(T)`** — just `[0, 1, 2, ..., T-1]` as a tensor — used to
+  look up "position 0's vector, position 1's vector, ..." in the position
+  embedding table.
+
 **Concept**: run several small attention heads in parallel instead of one
 big one, concatenate their outputs, and project back down — same total
 compute budget, but able to represent several distinct kinds of

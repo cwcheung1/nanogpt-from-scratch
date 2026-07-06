@@ -14,6 +14,10 @@ from torch.nn import functional as F
 
 from common import vocab_size, get_batch, estimate_loss, decode
 
+# Fixes every "random" number below (batch sampling, weight init) to a
+# specific reproducible sequence — otherwise two runs of this exact code
+# would get different random batches and you couldn't tell whether a change
+# you made actually helped or you just got a luckier draw.
 torch.manual_seed(1337)
 # Use the GPU if one's available (much faster), otherwise fall back to CPU —
 # every lesson from here on follows this same pattern.
@@ -26,8 +30,14 @@ eval_interval = 300  # print train/val loss every this many steps
 learning_rate = 1e-2  # how big a step the optimizer takes each update
 
 
+# Inheriting from nn.Module is what lets PyTorch automatically discover
+# which numbers inside this object are learnable parameters, so the
+# optimizer below can find and update them without any manual bookkeeping.
 class BigramLanguageModel(nn.Module):
     def __init__(self, vocab_size):
+        # Plain Python, not PyTorch-specific: run nn.Module's own setup
+        # first, before adding this model's own layer below. Always the
+        # first line of __init__ for any nn.Module subclass.
         super().__init__()
         # A normal embedding table maps token id -> a learned vector of some
         # OTHER size (see roadmap). Here we deliberately make the output
@@ -77,6 +87,8 @@ class BigramLanguageModel(nn.Module):
         for _ in range(max_new_tokens):
             logits, _ = self(idx)  # (B, T, C) — recomputes the WHOLE sequence
             logits = logits[:, -1, :]  # every step, but only the LAST position's
+            # dim=-1 = "operate across the last dimension" — here, turn each
+            # row's 65 raw logits into 65 probabilities that sum to 1.
             probs = F.softmax(logits, dim=-1)  # logits get used — a bigram
             # model has no way to use earlier context even if it were given
             # it, so recomputing the full sequence here is pure waste. This
@@ -112,8 +124,14 @@ if __name__ == "__main__":
     # Start generation from a single "empty" character (index 0) and see what
     # a completely untrained (random-weights) model babbles — pure noise,
     # since nothing has been learned yet.
+    # dtype=torch.long: store these as whole integers, since they're
+    # character indices (into the vocab), not measurements. The single 0
+    # is the "start of sequence" character to generate from.
     context = torch.zeros((1, 1), dtype=torch.long, device=device)
     print("\n--- before training ---")
+    # [0] drops the batch dimension (only 1 sequence here); .tolist() turns
+    # the tensor of character-indices back into a plain Python list, which
+    # decode() (a plain dict lookup) can iterate over.
     print(decode(model.generate(context, max_new_tokens=200)[0].tolist()))
 
     # --- the training loop (see roadmap glossary for the 4-step breakdown) ---

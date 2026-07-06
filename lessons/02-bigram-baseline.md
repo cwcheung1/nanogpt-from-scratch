@@ -4,6 +4,23 @@
 this lesson assumes you already know what "loss", "embedding", "logits",
 and "the training loop" mean, and won't re-explain them.*
 
+**Jargon buster — new terms this lesson's code uses** (full definitions in
+the roadmap's [PyTorch/Python idioms](00-roadmap.md#pytorchpython-idioms--the-code-level-words-not-the-ml-concept-words)
+section; this is just a preview so nothing below stops you cold):
+- `nn.Module` — the base class `BigramLanguageModel` inherits from; lets
+  PyTorch find this model's learnable numbers automatically.
+- `super().__init__()` — plain Python: run the parent class's own setup
+  first, before adding this model's own layer.
+- `optimizer` / `AdamW` — the algorithm that turns "which direction reduces
+  loss" into an actual update to the model's numbers. Black box for now.
+- `.to(device)` — moves the model/data onto the GPU, if one's available.
+- `dim=-1` (in `F.softmax(logits, dim=-1)`) — "operate across the last
+  dimension" — here, the 65 per-position logits.
+- `torch.manual_seed(1337)` — makes this script's "random" numbers
+  reproducible run-to-run.
+- `.tolist()` — converts a tensor back into a plain Python list, so
+  `decode()` can use it.
+
 **Concept**: the first actual model in this repo (lesson 1 had none). The
 simplest possible neural language model predicts the next character using
 *only* the single character right before it — no attention, no hidden

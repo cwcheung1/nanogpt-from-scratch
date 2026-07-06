@@ -132,6 +132,64 @@ time, every lesson assumes you've read the definition here.
   stability. See lesson 1 for the full "parallel means parallel on the
   hardware, not related to each other" breakdown.
 
+## PyTorch/Python idioms — the code-level words, not the ML-concept words
+
+The glossary above defines *machine-learning* terms (logit, loss, embedding).
+This section defines the *PyTorch/Python* syntax that shows up in literally
+every lesson's code, regardless of which ML concept that lesson teaches.
+These aren't concepts to sit and think about — they're small, fixed pieces
+of syntax, defined once so no lesson has to stop and re-explain them.
+
+- **`torch`**: the library itself. Provides tensors (see glossary above)
+  and fast, GPU-capable math on them — think "numpy, but tensors can live on
+  a GPU and PyTorch can automatically compute derivatives for them."
+- **`torch.nn`** (imported as `nn`): the part of `torch` that provides
+  ready-made *layers* — reusable pieces of math with their own learnable
+  numbers already wired up (`nn.Linear`, `nn.Embedding`, `nn.LayerNorm`,
+  ...). You assemble a model out of these instead of writing raw matrix
+  multiplication by hand every time.
+- **`nn.Module`**: the base class every model/layer in this repo inherits
+  from (`class BigramLanguageModel(nn.Module)`). Inheriting from it is what
+  lets PyTorch automatically discover "which numbers inside this object are
+  learnable parameters" so the optimizer can find and update them — you
+  don't do that bookkeeping by hand.
+- **`super().__init__()`**: plain Python, not PyTorch-specific — every
+  `__init__` that inherits from a parent class calls this first, to run the
+  parent class's (here, `nn.Module`'s) own setup before adding your own
+  layers on top. Always the first line inside `__init__` in this repo.
+- **`optimizer` (`torch.optim.AdamW`)**: the algorithm that turns "which
+  direction would reduce the loss" (computed by `loss.backward()`, see
+  Training loop above) into an actual change to every parameter. AdamW is
+  just the specific, standard variant used here and in GPT-2/nanoGPT —
+  treat its internals as a black box; every lesson's training loop is
+  `zero_grad()` → `backward()` → `step()`, always in that order.
+- **`.to(device)`**: moves a tensor or model's numbers into GPU memory (if
+  `device == "cuda"`) so the GPU does the math instead of the CPU. Every
+  lesson computes `device = "cuda" if torch.cuda.is_available() else
+  "cpu"` once near the top and calls `.to(device)` on the model and on each
+  batch of data.
+- **`dim=-1`**: "the last dimension of this tensor." For a `(B, T, C)`
+  logits tensor, `dim=-1` means "operate across the `C` values" — e.g.
+  `F.softmax(logits, dim=-1)` turns each position's `C` raw logits into `C`
+  probabilities that sum to 1, independently at every `(B, T)` position.
+- **`torch.manual_seed(1337)`**: fixes every "random" number PyTorch
+  generates from that point on to a specific, reproducible sequence. Without
+  it, two runs of identical code would get different random batches/weight
+  initializations and produce different loss numbers — you'd have no way to
+  tell if a change you made actually helped, or you just got a luckier
+  random draw. Every lesson's script calls this near the top for exactly
+  this reason.
+- **`.tolist()` / `.item()`**: convert a tensor back into plain Python
+  (`.tolist()` → a Python list, for feeding into `decode()`; `.item()` → a
+  single Python number, for something like `loss.item()`). Tensors have
+  their own numeric type; these calls step back out into ordinary Python
+  values for printing or further plain-Python use.
+- **`@torch.no_grad()`** (seen from lesson 4 on, decorating `generate`):
+  tells PyTorch "don't bother tracking gradients for anything in this
+  function" — gradient tracking is only needed during training
+  (`loss.backward()`), and skipping it during text generation is faster and
+  uses less memory.
+
 ## The 6-lesson journey — what each one adds, and why the previous one wasn't enough
 
 1. **[Tokenization & data prep](01-tokenization-and-data.md)** — no model
