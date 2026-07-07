@@ -144,6 +144,33 @@ time, every lesson assumes you've read the definition here.
   stability. See lesson 1 for the full "parallel means parallel on the
   hardware, not related to each other" breakdown.
 
+- **`n_embd`** (the embedding dimension — also called `d_model` in the
+  original Transformer paper, or `hidden_size` in Hugging Face configs):
+  how many numbers describe *each single character*. Easy to confuse with
+  `vocab_size` (65) since both are "just a number near the code that talks
+  about characters" — they are **not** the same axis. `vocab_size` is how
+  many *distinct* characters exist (fixed by the data); `n_embd` is how
+  richly *each one* gets described (32 in lessons 4-5, 384 in lesson 6 —
+  free to change, unrelated to `vocab_size`). A shape like `(1, 8, 32)` is
+  1 sequence, 8 characters, 32 numbers *per* character — the `32` is not
+  "32 more characters."
+
+- **Is this number a choice, or fixed, or computed?** Every hyperparameter
+  you meet falls into exactly one of three buckets — worth asking every
+  time one shows up:
+  1. **Data-fixed** — determined by the dataset, not a choice (`vocab_size`).
+  2. **Arbitrary design choice** — picked by whoever wrote the code, no
+     formula behind it (`n_embd`; lesson 3's standalone `head_size = 16`).
+  3. **Formula-derived** — computed from other choices (lesson 4+'s
+     `head_size = n_embd // n_head` — the real free choice is `n_head`,
+     `head_size` just falls out of the division).
+  Also worth internalizing early: none of the numbers *inside* a learned
+  vector (an embedding, or a query/key/value vector) has an assigned
+  meaning — nobody decides "dimension 7 means X." Every one starts as
+  noise and becomes whatever training finds useful. A width like `n_embd`
+  or `head_size` controls *how many* such free numbers a component gets
+  to work with, not *which specific things* get computed in which slot.
+
 ## PyTorch/Python idioms — the code-level words, not the ML-concept words
 
 The glossary above defines *machine-learning* terms (logit, loss, embedding).

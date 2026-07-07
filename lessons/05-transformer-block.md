@@ -90,7 +90,14 @@ mangled before it reaches the end.
 
 - `GPTLanguageModel` stacks `n_layer=4` blocks via `nn.Sequential`, then one
   final `ln_f` before the output head — same token+position embedding setup
-  as lesson 4.
+  as lesson 4. **`n_layer` is a different axis from `n_head`, worth keeping
+  separate**: `n_head` (lesson 4) is *width* — how many parallel attention
+  heads run side by side inside one block, all looking at the same input at
+  once. `n_layer` is *depth* — how many blocks run one after another, each
+  one's output feeding the next. Turning up `n_head` gives one block more
+  simultaneous perspectives; turning up `n_layer` gives the model more
+  sequential rounds of "communicate, then compute" (this lesson's ablation
+  is specifically about whether information survives that depth).
 
 - **The ablation** (`use_residual=False` path in `Block.forward`): identical
   architecture, identical seed, identical hyperparameters — the *only*

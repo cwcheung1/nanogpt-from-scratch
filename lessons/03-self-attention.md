@@ -40,19 +40,76 @@ by those scores. That's it — that whole sentence is what "self-attention"
 means. It's a strict upgrade over lesson 2's bigram, which could only ever
 look at exactly 1 character back with a fixed, non-learned rule.
 
-**The mechanical version, first — no analogy yet**: each position produces
-3 vectors (via 3 separate learned linear layers — see roadmap glossary on
-`nn.Linear`) called query, key, and value. "Relevance score between
-position A and position B" = a dot product of A's query vector with B's key
-vector (dot product is just "how aligned are two vectors" — two vectors
-pointing the same direction score high, two pointing in unrelated
-directions score near 0). Turn all those raw scores into real probabilities
-with softmax (every row now sums to exactly 1), then use those
-probabilities as weights to take a weighted average of everyone's value
-vectors. Query/key decide the *weights* (how much to listen to each
-position); value is *what gets averaged*. That's the entire mechanism —
-everything else below is either terminology for a piece of it, or code that
-implements it.
+**What is a "Head"?** One self-contained unit that does this entire
+computation once: project the input into query, key, and value vectors,
+compute attention weights between every pair of positions, and blend the
+value vectors accordingly. It's called a *head* because lesson 4 runs
+several of these in parallel ("multi-head attention"), each with its own
+separately-learned weights, so each can specialize in noticing something
+different. This lesson builds exactly one head — there's nothing "multi"
+yet, just the base unit that gets repeated later.
+
+**The mechanical version, grounded in real text — no placeholder letters,
+no analogy yet**: take the 8 real characters `"Let's he"` (same window
+from lesson 1). Each character produces 3 vectors — query, key, and value
+— via 3 separate learned linear layers (see roadmap glossary on
+`nn.Linear`). Take two *specific* real positions instead of abstract
+letters: position 7 (the second `'e'`, in "he") and position 1 (the first
+`'e'`, in "Let's"). "A relevance score between two positions" is one real
+number — the dot product of position 7's query vector with position 1's
+key vector:
+
+```
+q[7] . k[1] = -1.070
+```
+
+— computed from two real 16-number vectors (dot product is just "how
+aligned are two vectors" — pointing the same direction scores high,
+unrelated directions score near 0). Doing that same dot product between
+position 7 and *every* position 0–7, then softmax-ing the results, gives
+position 7 a full row of real attention weights:
+
+```
+weight on position 0 ('L'): 0.138
+weight on position 1 ('e'): 0.107
+weight on position 2 ('t'): 0.120
+weight on position 3 ("'"): 0.103
+weight on position 4 ('s'): 0.164
+weight on position 5 (' '): 0.128
+weight on position 6 ('h'): 0.133
+weight on position 7 ('e'): 0.107
+```
+
+(These weights come from an untrained, randomly-initialized head, so don't
+read meaning into which position "won" — the *mechanism* is real and this
+traceable, but *which* positions end up mattering is what training teaches,
+starting lesson 4.) Query/key decide those weights (how much to listen to
+each position); value is a separate vector — *what actually gets averaged*
+using those weights, not the key, and not used for scoring at all.
+That's the entire mechanism — everything else below is either terminology
+for a piece of it, or code that implements it.
+
+**`head_size`: what it controls, and whether it's arbitrary.** `head_size`
+(16, above) is the width of the query/key/value vectors this head
+produces — a different number from `n_embd` (32), the width of each
+character's full embedding; the two are unrelated and worth keeping
+separate in your head. In *this* lesson, `head_size = 16` is a bare
+literal in the code — an arbitrary choice, not computed from anything.
+(From lesson 4 on, `head_size = n_embd // n_head` — at that point it
+becomes *derived*: the real free choice is `n_head`, how many heads to
+split the same total budget into, and `head_size` just falls out of that
+division. Worth knowing now so you're not hunting for a formula that
+doesn't exist yet.)
+
+One more thing worth stating plainly: none of these 16 numbers has an
+assigned meaning — nobody decided "dimension 7 will hold X." Every number
+in a query/key/value vector starts as noise and becomes whatever training
+finds useful. `head_size` controls *how many* such free, to-be-discovered
+numbers this head gets to work with, not *which specific things* get
+computed — a capacity knob, not a blueprint. Bigger `head_size` means more
+room to represent nuanced relevance (`head_size=1` could only express
+"high vs. low" along a single axis); it also costs more parameters and
+compute.
 
 One term that comes up a lot below: a **lower-triangular matrix** is just a
 square grid of numbers where everything *above* the diagonal (top-left to

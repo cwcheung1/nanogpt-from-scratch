@@ -40,7 +40,11 @@ findings into one summary.
   `head_size = n_embd // n_head` — splitting one 32-wide embedding into 4
   heads of size 8 keeps the concatenated output back at width 32, so this
   costs no extra parameters over one 32-wide head, it just restructures the
-  same budget into 4 independent "conversations."
+  same budget into 4 independent "conversations." **This is the moment
+  `head_size` stops being arbitrary**: in lesson 3 it was a bare literal
+  (`head_size = 16`, no formula). Here it becomes *derived* — the real free
+  choice is `n_head` (how many heads to split into), and `head_size` just
+  falls out of dividing the fixed `n_embd` budget by it.
 
 - **Position embeddings, introduced here for the first time**: attention has
   no built-in sense of sequence order. Concretely: the dot product `q @ k.T`
