@@ -6,13 +6,16 @@ ideas on top: a per-position MLP, residual connections, and LayerNorm, all
 defined in plain language below before they're used.*
 
 **Jargon buster — new terms this lesson's code uses**:
+
 - **`nn.Sequential(layer1, layer2, ...)`** — runs its input through each
   layer in order, output of one feeding into the next; used for `FeedForward`'s
   Linear→ReLU→Linear and for stacking the `Block`s themselves.
+
 - **`nn.ReLU()`** — a simple nonlinearity: replace every negative number
   with 0, leave positive numbers unchanged. Without *some* nonlinearity
   between the two `Linear` layers, stacking them would collapse
   mathematically into one bigger linear layer — no added expressive power.
+
 - **`nn.LayerNorm(n_embd)`** — see "Two new terms" below in this lesson's
   main text; it's defined there in full rather than repeated here.
 
@@ -27,6 +30,7 @@ below that make it possible to stack many of these blocks deep without
 training falling apart.
 
 **Two new terms, defined before you hit them in the code:**
+
 - **Residual / skip connection**: instead of `x = f(x)` (replace the input
   entirely with the transformation's output), do `x = x + f(x)` (add the
   transformation's output ON TOP of the original input). The original
@@ -34,6 +38,7 @@ training falling apart.
   this step computed — nothing is ever fully overwritten. Why this matters
   for training specifically is explained below, and demonstrated with a
   real side-by-side experiment, not just asserted.
+
 - **LayerNorm**: a fixed (non-learned-in-the-interesting-sense) rescaling
   step, applied to every position's vector independently, that shifts and
   scales its numbers to have a consistent mean (~0) and spread (~1) before
@@ -52,17 +57,21 @@ every single round, and the more rounds you stack, the more likely it gets
 mangled before it reaches the end.
 
 **How it works** (`lessons/code/05_transformer_block.py`):
+
 - `FeedForward`: `Linear(n_embd, 4*n_embd) -> ReLU -> Linear(4*n_embd,
   n_embd)`. The 4x expansion-then-contraction matches GPT-2 and the
   original Transformer paper — attention moved information *between*
   positions, this is where per-position "thinking" capacity actually lives.
+
 - `Block.forward`: `x = x + self.sa(self.ln1(x))` then `x = x +
   self.ffwd(self.ln2(x))`. Two things to notice:
+
   - **Pre-norm**: `LayerNorm` is applied *before* attention/feedforward, not
     after. The original 2017 "Attention Is All You Need" paper used
     post-norm; GPT-2 switched to pre-norm because it trains more stably at
     depth, and every modern LLM (including, as far as public architecture
     descriptions go, Claude) follows suit.
+
   - **Residual = `x + f(x)`, not `x = f(x)`**: the input skips around the
     transformation and gets added back. Recall from the roadmap glossary
     that training's "backward pass" works out, for every parameter, "which
@@ -78,9 +87,11 @@ mangled before it reaches the end.
     — that `+1` is exactly the guaranteed direct path. You don't need to be
     able to derive this to use it; the ablation below shows the effect
     directly, without any calculus.)
+
 - `GPTLanguageModel` stacks `n_layer=4` blocks via `nn.Sequential`, then one
   final `ln_f` before the output head — same token+position embedding setup
   as lesson 4.
+
 - **The ablation** (`use_residual=False` path in `Block.forward`): identical
   architecture, identical seed, identical hyperparameters — the *only*
   difference is `x = self.sa(self.ln1(x))` (replace) instead of `x =

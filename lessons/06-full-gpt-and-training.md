@@ -8,15 +8,19 @@ below before use.*
 **Jargon buster — new terms this lesson's code uses** (the "Three new
 terms" section below covers Dropout/gradient clipping/init in full — this
 just adds the remaining plain code mechanics):
+
 - **`model.apply(fn)`** — calls `fn` once on every submodule inside
   `model`; used here to run `_init_weights` on every `Linear`/`Embedding`
   in the whole network in one line.
+
 - **`isinstance(module, nn.Linear)`** — plain Python: "is this specific
   submodule a `Linear` layer?" — used to apply different init rules to
   `Linear` vs. `Embedding` layers.
+
 - **`@torch.no_grad()`** (decorating `generate`) — skip gradient tracking
   for this whole function; only needed during training, and skipping it
   during generation is faster and uses less memory.
+
 - **`model.state_dict()`** / **`torch.save(...)`** — `state_dict()` is a
   plain dict of `{layer name: learned tensor}`; `torch.save` writes it to
   disk so the trained weights can be reloaded later without retraining.
@@ -29,6 +33,7 @@ run it long enough to see both a good result *and* a real failure mode
 (overfitting, defined in the roadmap glossary) show up in the loss curve.
 
 **Three new terms, defined before you hit them in the code:**
+
 - **Dropout**: during training only, randomly pick some fraction of values
   (here 20%, `p=0.2`) in a layer's output and force them to exactly 0 for
   that one forward pass, picking a different random subset each time. This
@@ -39,6 +44,7 @@ run it long enough to see both a good result *and* a real failure mode
   exact training sentence" if unit #47 randomly vanishes 20% of the time).
   Dropout is automatically switched off during generation/evaluation — it's
   purely a training-time regularizer.
+
 - **Gradient clipping**: recall from the roadmap glossary that
   `loss.backward()` computes a gradient (a "which direction helps" nudge)
   for every parameter. Occasionally, one unusually extreme training batch
@@ -47,6 +53,7 @@ run it long enough to see both a good result *and* a real failure mode
   total size of that gradient update before it's applied — if it's under
   the cap, nothing changes; if it's over, it gets scaled down to the cap.
   Cheap insurance against rare, destabilizing updates at this scale and up.
+
 - **GPT-2-style weight initialization**: before training starts, every
   layer's weights need *some* starting values (they can't start at exactly
   0, or the model would have no way to distinguish anything). This project
@@ -65,24 +72,29 @@ memorizing the training set's specific sentences instead of learning
 general structure, and gets *worse* at everything else.
 
 **How it works** (`lessons/code/06_full_gpt_and_training.py`):
+
 - Architecture is identical to lesson 5's `Block`/`GPTLanguageModel` — same
   attention, same MLP, same residual+pre-LN pattern — just scaled up
   (`n_embd` 32→384, `n_head` 4→6, `n_layer` 4→6, `block_size` 8→256).
   Nothing conceptually new in the architecture itself; this lesson is about
   what changes when you scale it and train it properly.
+
 - **Dropout** (`nn.Dropout(0.2)`, added inside `Head`, `MultiHeadAttention`,
   and `FeedForward`): randomly zeroes some values during training so the
   model can't over-rely on any single attention weight or MLP unit being
   present — a direct regularizer against the overfitting this lesson's run
   demonstrates.
+
 - **Gradient clipping** (`torch.nn.utils.clip_grad_norm_(model.parameters(),
   1.0)`): caps the total gradient norm before the optimizer step, preventing
   any single unusually large batch from producing a destabilizing update —
   standard practice at this scale and up.
+
 - **GPT-2-style init** (`_init_weights`): small (`std=0.02`) normal
   initialization for `Linear`/`Embedding` weights, zero bias. Not
   load-bearing for a model this small, but it's the actual scheme GPT-2 and
   nanoGPT use, worth having muscle memory for.
+
 - Checkpoint saved via `torch.save(model.state_dict(), ...)` — the standard
   PyTorch way to persist trained weights (gitignored here since it's a
   binary artifact, not source).

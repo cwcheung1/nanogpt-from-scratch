@@ -65,15 +65,18 @@ time, every lesson assumes you've read the definition here.
   library knows how to do fast, vectorized math on it, including on a GPU."
   A tensor's **shape** is just its dimensions, e.g. shape `(4, 8)` means "4
   rows, 8 columns."
+
 - **Parameters / weights**: the actual numbers a model learns. Before
   training they're random; training's whole job is nudging them so the
   model's outputs get closer to correct. "An 11M-parameter model" means
   there are 11 million individual numbers being learned.
+
 - **Neural network layer**: a function that takes a tensor in, does some
   fixed kind of math involving its own learnable weights, and produces a
   tensor out. `nn.Linear` (a learned matrix multiply) and `nn.Embedding` (a
   learned lookup table, below) are the two you'll see constantly. A model is
   just several layers chained together.
+
 - **Embedding**: a lookup table that maps each item in a fixed vocabulary
   (e.g. each of the 65 possible characters) to a list of numbers (a
   "vector") that the model learns. Instead of the model seeing the number
@@ -81,16 +84,19 @@ time, every lesson assumes you've read the definition here.
   character `12` represents" — giving the model room to encode *properties*
   of that character (which other characters it tends to appear near, etc.),
   not just its arbitrary ID.
+
 - **Logits**: the model's raw, un-normalized output scores for "how likely
   is each possible next character" — one number per character in the
   vocabulary, before they've been turned into actual probabilities. Bigger
   logit = model thinks that character is more likely. They can be any
   positive or negative number; they don't sum to 1 yet.
+
 - **Softmax**: the function that turns a row of logits into real
   probabilities — squashes every value into (0, 1) and makes the whole row
   sum to exactly 1. Applied whenever we need "an actual probability
   distribution to sample the next character from," not just relative
   scores.
+
 - **Loss / cross-entropy loss**: one number summarizing "how wrong was the
   model's probability guess, on average, across every prediction in a
   batch." Cross-entropy specifically penalizes the model for putting low
@@ -98,21 +104,25 @@ time, every lesson assumes you've read the definition here.
   lower loss = the model assigned higher probability to the right answer,
   on average. This is the single number training tries to shrink, and the
   number in the scoreboard table above.
+
 - **Training loop**: the repeating cycle that actually improves the model:
   1. grab a batch of (history, correct-next-character) examples (lesson 1's
      `get_batch`)
+
   2. run them through the model to get logits, compute the loss
   3. **backward pass**: PyTorch automatically works out, for every one of
      the model's parameters, "if I nudged this number slightly, would the
      loss go up or down, and by how much" (this is `loss.backward()` —
      you'll never need to compute this by hand, PyTorch does it for every
      model in this repo)
+
   4. **optimizer step**: actually nudge every parameter a small step in the
      direction that reduces loss (`optimizer.step()`)
   4000+ repeats of this cycle is "training." None of the lessons ask you to
   understand step 3's calculus — treat `loss.backward()` as "PyTorch figures
   out which direction helps," and focus on *what* is being trained and
   *why* the architecture around it is shaped the way it is.
+
 - **train / validation (val) split & overfitting**: `train_data` is what the
   loop above actually learns from. `val_data` is held out and never trained
   on — its only job is to be checked periodically as an honesty test: does
@@ -121,10 +131,12 @@ time, every lesson assumes you've read the definition here.
   rises), that gap is called **overfitting** — the model is memorizing
   specifics instead of learning generalizable patterns. You'll see this
   happen for real in lesson 6.
+
 - **`block_size`** (context length): how many characters of history the
   model is shown before predicting the next one. A hard limit, not a
   preference — the model is physically incapable of using more context than
   this, by construction.
+
 - **`batch_size`**: how many independent, unrelated training examples get
   bundled together and processed as one unit, purely for hardware speed
   (a GPU multiplies a batch of N examples through the network in about the
@@ -143,35 +155,42 @@ of syntax, defined once so no lesson has to stop and re-explain them.
 - **`torch`**: the library itself. Provides tensors (see glossary above)
   and fast, GPU-capable math on them — think "numpy, but tensors can live on
   a GPU and PyTorch can automatically compute derivatives for them."
+
 - **`torch.nn`** (imported as `nn`): the part of `torch` that provides
   ready-made *layers* — reusable pieces of math with their own learnable
   numbers already wired up (`nn.Linear`, `nn.Embedding`, `nn.LayerNorm`,
   ...). You assemble a model out of these instead of writing raw matrix
   multiplication by hand every time.
+
 - **`nn.Module`**: the base class every model/layer in this repo inherits
   from (`class BigramLanguageModel(nn.Module)`). Inheriting from it is what
   lets PyTorch automatically discover "which numbers inside this object are
   learnable parameters" so the optimizer can find and update them — you
   don't do that bookkeeping by hand.
+
 - **`super().__init__()`**: plain Python, not PyTorch-specific — every
   `__init__` that inherits from a parent class calls this first, to run the
   parent class's (here, `nn.Module`'s) own setup before adding your own
   layers on top. Always the first line inside `__init__` in this repo.
+
 - **`optimizer` (`torch.optim.AdamW`)**: the algorithm that turns "which
   direction would reduce the loss" (computed by `loss.backward()`, see
   Training loop above) into an actual change to every parameter. AdamW is
   just the specific, standard variant used here and in GPT-2/nanoGPT —
   treat its internals as a black box; every lesson's training loop is
   `zero_grad()` → `backward()` → `step()`, always in that order.
+
 - **`.to(device)`**: moves a tensor or model's numbers into GPU memory (if
   `device == "cuda"`) so the GPU does the math instead of the CPU. Every
   lesson computes `device = "cuda" if torch.cuda.is_available() else
   "cpu"` once near the top and calls `.to(device)` on the model and on each
   batch of data.
+
 - **`dim=-1`**: "the last dimension of this tensor." For a `(B, T, C)`
   logits tensor, `dim=-1` means "operate across the `C` values" — e.g.
   `F.softmax(logits, dim=-1)` turns each position's `C` raw logits into `C`
   probabilities that sum to 1, independently at every `(B, T)` position.
+
 - **`torch.manual_seed(1337)`**: fixes every "random" number PyTorch
   generates from that point on to a specific, reproducible sequence. Without
   it, two runs of identical code would get different random batches/weight
@@ -179,11 +198,13 @@ of syntax, defined once so no lesson has to stop and re-explain them.
   tell if a change you made actually helped, or you just got a luckier
   random draw. Every lesson's script calls this near the top for exactly
   this reason.
+
 - **`.tolist()` / `.item()`**: convert a tensor back into plain Python
   (`.tolist()` → a Python list, for feeding into `decode()`; `.item()` → a
   single Python number, for something like `loss.item()`). Tensors have
   their own numeric type; these calls step back out into ordinary Python
   values for printing or further plain-Python use.
+
 - **`@torch.no_grad()`** (seen from lesson 4 on, decorating `generate`):
   tells PyTorch "don't bother tracking gradients for anything in this
   function" — gradient tracking is only needed during training
@@ -197,12 +218,14 @@ of syntax, defined once so no lesson has to stop and re-explain them.
    manufacture the (history → correct-next-character) flashcards every
    later lesson trains on (`get_batch`). Everything downstream depends on
    this data format.
+
 2. **[Bigram baseline](02-bigram-baseline.md)** — the simplest possible
    model: one lookup table, predicting the next character using *only* the
    single character right before it (zero memory beyond that). Val loss
    ~2.48. **The problem this exposes**: it has a hard ceiling, because it's
    architecturally blind to anything more than 1 character back — no amount
    of extra training fixes that, only a different architecture can.
+
 3. **[Self-attention mechanics](03-self-attention.md)** — introduces the
    mechanism that lets a position pull information from *every* earlier
    position, weighted by *learned* relevance, instead of being stuck at 1.
@@ -211,6 +234,7 @@ of syntax, defined once so no lesson has to stop and re-explain them.
    before worrying about training dynamics on top. **The problem this
    exposes**: one attention head only extracts one kind of pattern; also,
    attention alone has no sense of word/character *order*.
+
 4. **[Multi-head attention](04-multi-head-attention.md)** — runs several
    attention heads in parallel (different heads can specialize in different
    kinds of relationships) and adds position embeddings (fixing the
@@ -219,6 +243,7 @@ of syntax, defined once so no lesson has to stop and re-explain them.
    over the bigram's ~2.48 ceiling, from using context beyond 1 character.
    **The problem this exposes**: attention alone doesn't let you *stack*
    many layers deep without training becoming unstable.
+
 5. **[The transformer block](05-transformer-block.md)** — wraps attention
    with a per-position "thinking" MLP, residual (skip) connections, and
    LayerNorm, then stacks 4 of these blocks. Val loss improves to ~2.10.
@@ -230,6 +255,7 @@ of syntax, defined once so no lesson has to stop and re-explain them.
    embeddings, 8-character context) — it works, but it's not yet at a scale
    or with the training details (dropout, gradient clipping) a real run
    needs.
+
 6. **[Full GPT, training, sampling](06-full-gpt-and-training.md)** — same
    architecture as lesson 5, scaled up to nanoGPT-tutorial size (384-dim
    embeddings, 256-character context, 6 layers, 6 heads, ~11M params) with
@@ -243,13 +269,16 @@ of syntax, defined once so no lesson has to stop and re-explain them.
 ## What this project deliberately does NOT cover
 
 So you don't wonder if you missed it:
+
 - **BPE (subword tokenization)** — real models don't use one-token-per-
   character; see lesson 1's writeup for what BPE is and why this project
   skips it on purpose.
+
 - **Fine-tuning / instruction-tuning / RLHF** — this project only covers
   *pretraining* (learning raw next-token prediction from a big pile of
   text). Turning that into something that follows instructions and chats
   helpfully is a separate, later stage — a different repo, not started yet.
+
 - **Serving/inference optimization** (KV-caching, quantization, batching
   requests from multiple users) — mentioned in passing (lesson 2 notes what
   the bigram model's wastefulness foreshadows), not built here.
@@ -258,12 +287,15 @@ So you don't wonder if you missed it:
 
 - Stuck on a specific term mid-lesson? Check the glossary above first —
   most jargon is defined once, here, not re-derived in every lesson.
+
 - Confused about *why* a lesson exists at all? Re-read its entry in "The
   6-lesson journey" above — every lesson is motivated by a specific,
   nameable gap in the previous one.
+
 - Lost in the code? Every lesson's script is heavily commented line-by-line
   — read the comments as a narration of what's happening and why, not just
   a label.
+
 - The scoreboard table near the top is the thing to hold onto when
   everything else feels like a lot of moving parts: **one number, getting
   better, one idea at a time.**

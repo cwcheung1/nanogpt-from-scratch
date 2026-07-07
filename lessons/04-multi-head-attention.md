@@ -5,11 +5,14 @@ reuses lesson 3's `Head` unchanged — if query/key/value or the causal mask
 are still fuzzy, that's the lesson to revisit, not this one).*
 
 **Jargon buster — new terms this lesson's code uses**:
+
 - **`nn.ModuleList([...])`** — a Python list of layers that PyTorch still
   recognizes as part of the model (a plain Python list wouldn't register
   its contents' parameters) — holds the independent attention heads.
+
 - **`torch.cat([...], dim=-1)`** — glues several tensors together along the
   given dimension; here, concatenates each head's output side by side.
+
 - **`torch.arange(T)`** — just `[0, 1, 2, ..., T-1]` as a tensor — used to
   look up "position 0's vector, position 1's vector, ..." in the position
   embedding table.
@@ -30,6 +33,7 @@ having a moderator (the output projection) synthesize their separate
 findings into one summary.
 
 **How it works** (`lessons/code/04_multi_head_attention.py`):
+
 - `MultiHeadAttention` is literally `nn.ModuleList([Head(head_size) for _ in
   range(num_heads)])`, run independently and `torch.cat`'d along the last
   dimension, then passed through one more `nn.Linear` (`proj`). Note
@@ -37,6 +41,7 @@ findings into one summary.
   heads of size 8 keeps the concatenated output back at width 32, so this
   costs no extra parameters over one 32-wide head, it just restructures the
   same budget into 4 independent "conversations."
+
 - **Position embeddings, introduced here for the first time**: attention has
   no built-in sense of sequence order. Concretely: the dot product `q @ k.T`
   that scores "how relevant is position j to position i" only looks at the
@@ -52,6 +57,7 @@ findings into one summary.
   "which character am I" and "where am I." (GPT-2/nanoGPT use this same
   additive learned-position-embedding scheme; rotary/ALiBi are alternatives
   you'll meet in production models, not covered here.)
+
 - `generate` now slices `idx[:, -block_size:]` before each forward pass —
   the bigram model in lesson 2 could ignore this because it only ever used
   the last token regardless of how much history you fed it, but an
@@ -59,6 +65,7 @@ findings into one summary.
   so the input window must be capped. This is your first encounter with
   *context window* as a hard architectural limit, not just a training
   convenience.
+
 - Everything else (train loop, `estimate_loss`, cross-entropy reshaping) is
   identical to lesson 2 — the point of this lesson is isolating "what did
   adding attention change," not introducing new training mechanics.

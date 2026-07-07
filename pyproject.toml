@@ -4,6 +4,17 @@ version = "0.1.0"
 description = "Building a GPT from scratch (Karpathy nanoGPT-style) to learn LLM pretraining mechanics"
 requires-python = ">=3.11"
 dependencies = [
+    "anthropic>=0.116.0",
+    "fastapi>=0.139.0",
+    "markdown>=3.10.2",
     "numpy>=2.4.6",
+    "pygments>=2.20.0",
+    "python-multipart>=0.0.32",
     "torch>=2.12.1",
+    "uvicorn>=0.50.2",
+]
+
+[dependency-groups]
+dev = [
+    "jupyterlab>=4.6.1",
 ]

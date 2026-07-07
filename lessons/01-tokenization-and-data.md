@@ -6,10 +6,13 @@ what we're building overall and why this lesson comes first.*
 **Jargon buster — new terms this lesson's code uses** (full definitions in
 the roadmap's [PyTorch/Python idioms](00-roadmap.md#pytorchpython-idioms--the-code-level-words-not-the-ml-concept-words)
 section):
+
 - **tensor** — PyTorch's basic data container, a multi-dimensional array of
   numbers (a Python list, but with fast/GPU-capable math built in).
+
 - **`dtype=torch.long`** — store these numbers as whole integers, since
   they're character indices, not measurements.
+
 - **`torch.manual_seed(1337)`** — makes this script's "random" batch
   sampling reproducible run-to-run.
 
@@ -34,11 +37,13 @@ text file. Here's what `lessons/code/common.py` does to it, step by step:
    punctuation, newlines. For tiny-shakespeare there happen to be exactly
    **65** distinct characters. This list of 65 is called the **vocabulary**
    — it's the entire "alphabet" the model will ever know about.
+
 2. **Give each character in that vocabulary a fixed number**, based on its
    position in a sorted list. So maybe `'\n'` (newline) is `0`, `' '` (space)
    is `1`, `'A'` is `20`, and so on — the exact numbers don't matter, what
    matters is that the mapping is *fixed*: `'A'` always means the same
    number, every time.
+
 3. **Yes — every single character gets its own number, one-to-one, no
    exceptions.** This was verified by actually running the code:
    ```
@@ -57,6 +62,7 @@ In the code, the two lookup tables are named `stoi` and `itos`. These are
 **not** industry-standard acronyms — they're just abbreviated variable names
 (borrowed from Andrej Karpathy's original nanoGPT lecture, which this repo
 follows) that spell out what they do once expanded:
+
 - `stoi` = **s**tring **to** **i**nt → given a character, look up its number
 - `itos` = **i**nt **to** **s**tring → given a number, look up its character
 
@@ -101,8 +107,10 @@ Why bother holding data back, when we already have "the answers" (the text
 itself)? Because the goal was never to memorize Shakespeare word-for-word —
 it's to learn general patterns of the language well enough to predict
 characters in text the model has **never seen during training**.
+
 - `train_data` — what the model studies from. Every weight update comes from
   errors made on batches pulled from here.
+
 - `val_data` — a quiz the model never studies from. After training (or
   periodically during it), we compute the model's loss on `val_data` only to
   *check* whether it generalized, without ever letting that data influence
@@ -229,11 +237,14 @@ Citizen"` back to itself unchanged, and the unrolled context→target table
 ## You'll know it clicked when
 
 You can answer, in your own words, without looking anything up:
+
 - Why does `encode("hi")` return a list of exactly 2 numbers?
 - Why is `y` just `x` shifted one character to the right — what does that
   shifted copy represent?
+
 - If `block_size=8`, how many separate training signals come out of one
   window? (Answer: 8, not 1.)
+
 - If `batch_size=4`, are those 4 examples related to each other in the text?
   (Answer: no — they're 4 random, independent locations. "Parallel" refers to
   the hardware processing them simultaneously, not to any relationship

@@ -7,17 +7,23 @@ and "the training loop" mean, and won't re-explain them.*
 **Jargon buster — new terms this lesson's code uses** (full definitions in
 the roadmap's [PyTorch/Python idioms](00-roadmap.md#pytorchpython-idioms--the-code-level-words-not-the-ml-concept-words)
 section; this is just a preview so nothing below stops you cold):
+
 - `nn.Module` — the base class `BigramLanguageModel` inherits from; lets
   PyTorch find this model's learnable numbers automatically.
+
 - `super().__init__()` — plain Python: run the parent class's own setup
   first, before adding this model's own layer.
+
 - `optimizer` / `AdamW` — the algorithm that turns "which direction reduces
   loss" into an actual update to the model's numbers. Black box for now.
+
 - `.to(device)` — moves the model/data onto the GPU, if one's available.
 - `dim=-1` (in `F.softmax(logits, dim=-1)`) — "operate across the last
   dimension" — here, the 65 per-position logits.
+
 - `torch.manual_seed(1337)` — makes this script's "random" numbers
   reproducible run-to-run.
+
 - `.tolist()` — converts a tensor back into a plain Python list, so
   `decode()` can use it.
 
@@ -35,17 +41,20 @@ made probabilistic and trainable.
 
 **How it works** (`lessons/code/02_bigram_baseline.py`, now heavily
 commented — read the comments alongside this):
+
 - `nn.Embedding(vocab_size, vocab_size)` — an embedding (see roadmap
   glossary) normally maps a token id to a learned vector of some other size.
   Here the output size is *also* `vocab_size`, so each row of the table
   directly **is** the logits for "what comes next" — there's no separate
   output layer, because this one lookup table doubles as the whole model.
+
 - `forward` reshapes the `(B, T, C)` logits tensor into `(B*T, C)` before
   computing the loss, because PyTorch's `F.cross_entropy` wants one
   prediction-vs-answer pair per row, and we have `B*T` independent
   next-character predictions in one batch (this is lesson 1's "one 8-char
   window secretly gives 8 flashcards" idea, now actually being scored by a
   loss function for the first time).
+
 - `generate` calls the model repeatedly: get logits for the last position →
   `softmax` turns them into real probabilities → `torch.multinomial` picks
   one character *randomly, weighted by those probabilities* (not the single
@@ -60,6 +69,7 @@ commented — read the comments alongside this):
   exactly what KV-caching (a real inference-serving optimization, not
   covered in this repo) exists to eliminate — once a model actually has
   multi-character context worth reusing, which this one doesn't yet.
+
 - `estimate_loss` (in `common.py`) averages the loss over 200 random
   batches instead of trusting a single batch's loss, which jumps around too
   much to read reliably. Watch `train` and `val` loss printed side by side —
