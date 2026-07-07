@@ -22,6 +22,26 @@ what production models use. Nothing you learn here gets thrown away when
 you eventually look at a real model's code — it's the same shapes, the same
 few operations, just more of them.
 
+**What "Transformer" actually means, mapped to the lessons you'll build**:
+a *transformer* is a specific architecture (from the 2017 paper "Attention
+Is All You Need") whose defining feature is **self-attention** (lesson 3)
+as the mechanism positions use to exchange information — instead of older
+architectures like RNNs, which process one position at a time in strict
+order and can "forget" things over long distances. Concretely, a
+transformer is: token + position embeddings (lesson 4) feeding into a
+stack of **blocks** (lesson 5), each block being "communicate" (multi-head
+self-attention, lessons 3-4) then "compute" (a per-position feedforward
+MLP), wrapped in residual connections + LayerNorm, repeated `n_layer`
+times, then a final output head. Lesson 6 is exactly this structure at
+real scale. This project builds a **decoder-only** transformer specifically
+(same family as GPT-2/GPT-4/Claude) — "decoder-only" means it only ever
+looks backward at earlier positions (the causal mask, lesson 3), because
+its one job is predicting what comes next. The original paper had an
+encoder half too (built for translation); modern LLMs dropped it and kept
+only the decoder side. Nothing about the training mechanism (loss,
+`backward()`, the optimizer — see the glossary below) is transformer-
+specific; only the architecture itself (attention + blocks) is.
+
 ## What does "language model" actually mean, mechanically?
 
 Strip away every buzzword and a language model is a function with one job:
@@ -110,18 +130,50 @@ time, every lesson assumes you've read the definition here.
      `get_batch`)
 
   2. run them through the model to get logits, compute the loss
-  3. **backward pass**: PyTorch automatically works out, for every one of
-     the model's parameters, "if I nudged this number slightly, would the
-     loss go up or down, and by how much" (this is `loss.backward()` —
-     you'll never need to compute this by hand, PyTorch does it for every
-     model in this repo)
-
+  3. **backward pass** (`loss.backward()`) — see the next entry, it's worth
+     understanding, not skipping
   4. **optimizer step**: actually nudge every parameter a small step in the
      direction that reduces loss (`optimizer.step()`)
-  4000+ repeats of this cycle is "training." None of the lessons ask you to
-  understand step 3's calculus — treat `loss.backward()` as "PyTorch figures
-  out which direction helps," and focus on *what* is being trained and
-  *why* the architecture around it is shaped the way it is.
+  4000+ repeats of this cycle is "training."
+
+- **How `backward()` actually works** (took real back-and-forth to land the
+  first time — read slowly). Think of one learnable number as a dial.
+  Turning it changes a prediction, which changes how wrong you are (the
+  loss). `backward()` answers exactly one question per dial: *"if I turned
+  this up a tiny bit, would loss go up or down, and by how much?"* Proof,
+  not assertion: `w=3, x=2, target=10` gives `pred=6`, `loss=16`, and
+  `w.grad = -16`. Nudge `w` by `0.001` by hand (no autograd at all) and
+  recompute the loss — you get almost exactly the same number back
+  (`-15.996`). That's not a coincidence; it's the literal definition of a
+  derivative, computed exactly, not approximated.
+
+  This scales along 3 axes worth holding separately in mind:
+  - **Many weights, not one**: every learnable number in the model (every
+    entry in every embedding table and `Linear` weight matrix) gets this
+    *exact same treatment*, completely independently — its own dial, its
+    own gradient, computed simultaneously with every other one in a single
+    `backward()` call.
+  - **Many predictions, summed/averaged, not one**: real loss is an average
+    over every prediction in a batch (`cross_entropy`, lesson 2). A weight
+    shared across 2 predictions gets a gradient equal to the *average* of
+    what each prediction alone would have pushed it toward — proven: one
+    prediction alone gives gradient `-16`, another alone gives `70`, and
+    the actual combined-loss gradient is exactly their average, `27`. A
+    weight untouched by every prediction in a batch gets exactly `0` —
+    nudging it couldn't have changed an output it was never used to
+    produce.
+  - **Many chained steps, not one**: a real weight sits several operations
+    away from the loss, not right next to it. Tracing back through N steps
+    is just multiplying together N simple local rules, one hop at a time
+    (`effect of pred on loss` × `effect of h on pred` × `effect of w on h`).
+    Proven across a 3-step chain (multiply → multiply → square): `backward()`'s
+    answer, the hand-multiplied chain, and a finite-difference check across
+    the *whole* chain all agree (`-64.0`, `-64.0`, `-63.98`).
+
+  This whole "multiply local rules together, walking backward" process has
+  a name: **backpropagation** (or reverse-mode automatic differentiation).
+  It's the same mechanism underneath *every* neural network — nothing
+  about it is specific to attention or transformers.
 
 - **train / validation (val) split & overfitting**: `train_data` is what the
   loop above actually learns from. `val_data` is held out and never trained
