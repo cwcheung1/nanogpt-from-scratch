@@ -132,6 +132,7 @@ time, every lesson assumes you've read the definition here.
   2. run them through the model to get logits, compute the loss
   3. **backward pass** (`loss.backward()`) — see the next entry, it's worth
      understanding, not skipping
+
   4. **optimizer step**: actually nudge every parameter a small step in the
      direction that reduces loss (`optimizer.step()`)
   4000+ repeats of this cycle is "training."
@@ -148,11 +149,13 @@ time, every lesson assumes you've read the definition here.
   derivative, computed exactly, not approximated.
 
   This scales along 3 axes worth holding separately in mind:
+
   - **Many weights, not one**: every learnable number in the model (every
     entry in every embedding table and `Linear` weight matrix) gets this
     *exact same treatment*, completely independently — its own dial, its
     own gradient, computed simultaneously with every other one in a single
     `backward()` call.
+
   - **Many predictions, summed/averaged, not one**: real loss is an average
     over every prediction in a batch (`cross_entropy`, lesson 2). A weight
     shared across 2 predictions gets a gradient equal to the *average* of
@@ -162,6 +165,7 @@ time, every lesson assumes you've read the definition here.
     weight untouched by every prediction in a batch gets exactly `0` —
     nudging it couldn't have changed an output it was never used to
     produce.
+
   - **Many chained steps, not one**: a real weight sits several operations
     away from the loss, not right next to it. Tracing back through N steps
     is just multiplying together N simple local rules, one hop at a time
@@ -210,9 +214,11 @@ time, every lesson assumes you've read the definition here.
 - **Is this number a choice, or fixed, or computed?** Every hyperparameter
   you meet falls into exactly one of three buckets — worth asking every
   time one shows up:
+
   1. **Data-fixed** — determined by the dataset, not a choice (`vocab_size`).
   2. **Arbitrary design choice** — picked by whoever wrote the code, no
      formula behind it (`n_embd`; lesson 3's standalone `head_size = 16`).
+
   3. **Formula-derived** — computed from other choices (lesson 4+'s
      `head_size = n_embd // n_head` — the real free choice is `n_head`,
      `head_size` just falls out of the division).
@@ -344,6 +350,75 @@ of syntax, defined once so no lesson has to stop and re-explain them.
    you watch happen in the numbers rather than take on faith. This is the
    finish line for *pretraining mechanics*; see below for what's
    deliberately not covered.
+
+## Is leaving head specialization to randomness a waste of time?
+
+A fair, sharp question that comes up once you realize (lesson 4) that
+which specific head learns which specific pattern is essentially random —
+each head starts from different random weights, and nobody hand-designs
+what any of them focuses on. Worth answering directly rather than glossing
+over.
+
+**Yes, this really does suggest local minima** (technically local
+*minima* here, since training minimizes loss — same idea as "local
+maxima," just flipped). Training is non-convex optimization; different
+random initializations genuinely land in different specific solutions.
+Retrain the exact same architecture with a different random seed and
+you'd likely get heads that specialize in different specific things.
+
+**Why that isn't a waste of time anyway:**
+
+- It's not "random and hope" — gradient descent is relentless. Every
+  single training step pushes every head's weights toward reducing loss,
+  for the entire run, not just at initialization (see `backward()` above —
+  the same tracing mechanism applies to every parameter, every step).
+
+- In heavily overparameterized networks (which transformers are), the
+  *specific* local minimum tends to matter less than classical intuition
+  suggests — different seeds tend to converge to solutions of *similar
+  overall quality*, even though the internal division of labor (which head
+  does what) differs.
+
+- This is well-documented, not hidden: real research on pruning trained
+  attention heads shows some heads *do* end up redundant or safely
+  removable after training with little quality loss — some of that
+  "randomly assigned" capacity genuinely goes underused. Accepted cost,
+  not a secret flaw.
+
+- The bigger empirical fact that justifies the whole approach: decades of
+  NLP/CV research tried hand-engineering features *first*, and learned,
+  end-to-end-trained representations have consistently beaten hand-designed
+  ones once enough data and compute were available. (Sometimes called "the
+  bitter lesson" — general learning methods that lean on computation keep
+  outperforming clever hand-engineering as scale increases.) Hand-design
+  was tried; it kept losing.
+
+**So do people engineer anything?** Yes, extensively — just not *which
+specific pattern a specific head learns*. What's actually hand-engineered,
+all real examples from this repo:
+
+- **Architecture**: choosing self-attention at all, causal masking,
+  residual connections (lesson 5 — engineered specifically to fix a real,
+  measured gradient problem), pre-norm vs. post-norm, the 4x MLP expansion
+  ratio, splitting into multiple heads instead of one big head.
+
+- **Hyperparameters**: `n_layer`, `n_head`, `n_embd`, learning rate,
+  dropout rate.
+
+- **Training recipe**: optimizer choice, LR schedule, gradient clipping,
+  weight init scheme, the objective itself (next-token cross-entropy is a
+  human choice, not learned).
+
+- **Data + tokenization**: what to train on, how to clean it, BPE's design
+  (lesson 1).
+
+- **Post-training** (not in this repo, but real): RLHF, instruction
+  tuning, safety fine-tuning — heavily hand-engineered processes.
+
+The one thing deliberately left to learning: the actual numbers inside
+each weight matrix, and consequently which head ends up doing what. Not
+laziness — the one part of the system where letting gradient descent
+search has reliably beaten humans trying to hand-specify it.
 
 ## What this project deliberately does NOT cover
 

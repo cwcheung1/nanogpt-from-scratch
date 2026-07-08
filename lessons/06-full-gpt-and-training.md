@@ -43,7 +43,11 @@ run it long enough to see both a good result *and* a real failure mode
   overfitting (the model can't memorize "unit #47 always fires for this
   exact training sentence" if unit #47 randomly vanishes 20% of the time).
   Dropout is automatically switched off during generation/evaluation — it's
-  purely a training-time regularizer.
+  purely a training-time regularizer. `p=0.2` itself is an **arbitrary
+  choice** (roadmap glossary's 3-number framework) — a common empirically-
+  good starting value, not derived from any formula; bigger `p` = stronger
+  regularization but slower/harder training, and there's no shortcut for
+  finding the best value besides trying a few.
 
 - **Gradient clipping**: recall from the roadmap glossary that
   `loss.backward()` computes a gradient (a "which direction helps" nudge)
@@ -62,6 +66,11 @@ run it long enough to see both a good result *and* a real failure mode
   GPT-2's own scheme. Not load-bearing at this small a scale — this model
   would likely train fine with PyTorch's own default init too — but worth
   having as muscle memory since it's what real GPT-style models use.
+  `std=0.02` is also an **arbitrary choice** — GPT-2's authors picked it
+  empirically, it's not derived from `n_embd`, `vocab_size`, or anything
+  else in this repo; different model sizes in the wild do sometimes scale
+  their init std with depth/width, but that's a separate, more advanced
+  scheme this project doesn't use.
 
 **Analogy**: lessons 2-5 were building and testing a car's components one
 at a time in a garage — engine, transmission, brakes, all bench-tested

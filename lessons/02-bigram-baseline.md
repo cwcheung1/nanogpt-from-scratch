@@ -5,7 +5,7 @@ this lesson assumes you already know what "loss", "embedding", "logits",
 and "the training loop" mean, and won't re-explain them.*
 
 **Jargon buster — new terms this lesson's code uses** (full definitions in
-the roadmap's [PyTorch/Python idioms](00-roadmap.md#pytorchpython-idioms--the-code-level-words-not-the-ml-concept-words)
+the roadmap's [PyTorch/Python idioms](00-roadmap.md#pytorchpython-idioms-the-code-level-words-not-the-ml-concept-words)
 section; this is just a preview so nothing below stops you cold):
 
 - `nn.Module` — the base class `BigramLanguageModel` inherits from; lets

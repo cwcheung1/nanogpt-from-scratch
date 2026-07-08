@@ -32,6 +32,28 @@ such people simultaneously, each with a different question in mind, then
 having a moderator (the output projection) synthesize their separate
 findings into one summary.
 
+**Same math, different weights — not different code.** Every head created
+by `[Head(head_size) for _ in range(num_heads)]` is the *literal same
+class*, running the *literal same* `forward()` — nobody hand-designs what
+any individual head focuses on, and there's no per-head branch in the code.
+What makes two heads end up different is only this: each gets its own
+freshly-initialized random weights when created, and its own independent
+slice of gradient updates during training (only from the loss that flowed
+through *that* head — same tracing mechanism as the roadmap's `backward()`
+walkthrough). Given the *same* input, two freshly-initialized heads already
+produce different outputs purely from that random start — proof, not
+assertion: two `Head` instances fed the identical input vector produced
+`[0.184, -0.17, 0.149, 0.003, ...]` and `[0.364, -0.168, 0.223, 0.13, ...]`
+respectively. Same formula, different learned numbers, different answers.
+Training then pushes each head's *own* numbers to reduce loss — since they
+start from different random points, they tend to drift toward specializing
+in different things, not because anyone told them to.
+
+*If you're wondering whether this randomness is wasteful, or how it relates
+to local minima* — real, fair questions — see the roadmap's
+["Is leaving this to randomness a waste of time?"](00-roadmap.md#is-leaving-head-specialization-to-randomness-a-waste-of-time)
+section.
+
 **How it works** (`lessons/code/04_multi_head_attention.py`):
 
 - `MultiHeadAttention` is literally `nn.ModuleList([Head(head_size) for _ in

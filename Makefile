@@ -1,7 +1,10 @@
-.PHONY: setup lesson1 lesson2 lesson3 lesson4 lesson5 lesson6 test clean
+.PHONY: setup dev lesson1 lesson2 lesson3 lesson4 lesson5 lesson6 test clean
 
 setup:
 	uv sync
+
+dev:
+	uv run uvicorn viewer.app:app --host 0.0.0.0 --port 8090
 
 lesson1:
 	uv run python lessons/code/01_tokenization_and_data.py

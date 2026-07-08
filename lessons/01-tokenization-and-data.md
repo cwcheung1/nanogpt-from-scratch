@@ -4,7 +4,7 @@
 what we're building overall and why this lesson comes first.*
 
 **Jargon buster — new terms this lesson's code uses** (full definitions in
-the roadmap's [PyTorch/Python idioms](00-roadmap.md#pytorchpython-idioms--the-code-level-words-not-the-ml-concept-words)
+the roadmap's [PyTorch/Python idioms](00-roadmap.md#pytorchpython-idioms-the-code-level-words-not-the-ml-concept-words)
 section):
 
 - **tensor** — PyTorch's basic data container, a multi-dimensional array of

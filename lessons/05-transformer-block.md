@@ -11,10 +11,18 @@ defined in plain language below before they're used.*
   layer in order, output of one feeding into the next; used for `FeedForward`'s
   Linear→ReLU→Linear and for stacking the `Block`s themselves.
 
-- **`nn.ReLU()`** — a simple nonlinearity: replace every negative number
-  with 0, leave positive numbers unchanged. Without *some* nonlinearity
-  between the two `Linear` layers, stacking them would collapse
-  mathematically into one bigger linear layer — no added expressive power.
+- **`nn.ReLU()`** — a simple nonlinearity: `ReLU(x) = max(0, x)`. Negative
+  numbers become 0; positive numbers pass through completely unchanged.
+  That's the whole function — proof it matters, not just definition: two
+  `Linear` layers stacked with **no** activation between them give the
+  *exact same output* as one single combined `Linear` layer (mathematically
+  guaranteed — stacking linear transformations always collapses into one
+  linear transformation, no matter how many you chain). Insert `ReLU`
+  between them and the output becomes something no single `Linear` layer
+  could ever produce — `max(0, x)` isn't expressible as a matrix multiply,
+  so it breaks the collapse. ReLU itself is dumb; its entire value is
+  *preventing two stacked layers from secretly being one layer*, not doing
+  anything clever on its own.
 
 - **`nn.LayerNorm(n_embd)`** — see "Two new terms" below in this lesson's
   main text; it's defined there in full rather than repeated here.
@@ -97,7 +105,13 @@ mangled before it reaches the end.
   one's output feeding the next. Turning up `n_head` gives one block more
   simultaneous perspectives; turning up `n_layer` gives the model more
   sequential rounds of "communicate, then compute" (this lesson's ablation
-  is specifically about whether information survives that depth).
+  is specifically about whether information survives that depth). **Note
+  they're both literally set to `4` in this lesson's code** (and both `6`
+  in lesson 6) — same number, unrelated meaning. If you're ever unsure
+  which one a line is talking about, check *what it's being passed into*:
+  `n_head` always goes into building one `Block`/`MultiHeadAttention`;
+  `n_layer` always controls the `range(...)` that decides how many `Block`s
+  get created.
 
 - **The ablation** (`use_residual=False` path in `Block.forward`): identical
   architecture, identical seed, identical hyperparameters — the *only*

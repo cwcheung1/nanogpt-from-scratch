@@ -7,7 +7,7 @@ mechanism, on random data, so training details can't distract from what
 attention itself actually computes.*
 
 **Jargon buster — new terms this lesson's code uses** (full definitions in
-the roadmap's [PyTorch/Python idioms](00-roadmap.md#pytorchpython-idioms--the-code-level-words-not-the-ml-concept-words)
+the roadmap's [PyTorch/Python idioms](00-roadmap.md#pytorchpython-idioms-the-code-level-words-not-the-ml-concept-words)
 section; `nn.Module`/`super().__init__()`/`dim=-1` were already covered in
 lesson 2's jargon buster and won't be repeated here):
 
@@ -48,6 +48,17 @@ several of these in parallel ("multi-head attention"), each with its own
 separately-learned weights, so each can specialize in noticing something
 different. This lesson builds exactly one head — there's nothing "multi"
 yet, just the base unit that gets repeated later.
+
+*Why "head," specifically? Not an arbitrary label — it's a real lineage.*
+Alan Turing's 1936 Turing Machine had a "read/write head": a mechanism that
+moves along a tape and reads/writes at one spot, same general sense as a
+tape head or print head on a physical device. In 2014, Alex Graves'
+"Neural Turing Machines" (Google) borrowed that exact term — "read heads"
+and "write heads" — for a differentiable neural memory mechanism built on
+soft attention. The 2017 "Attention Is All You Need" paper's "multi-head
+attention" is a direct continuation of that lineage, not a fresh metaphor —
+each head is its own independent attention mechanism, echoing the NTM's
+independent read/write heads. ([Graves et al. 2014](https://arxiv.org/pdf/1410.5401))
 
 **The mechanical version, grounded in real text — no placeholder letters,
 no analogy yet**: take the 8 real characters `"Let's he"` (same window

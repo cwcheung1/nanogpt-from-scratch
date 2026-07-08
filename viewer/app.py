@@ -304,11 +304,14 @@ def lesson(n: int):
 
     def fix_link(m):
         target = m.group(1)
-        num = re.match(r"(\d\d)-", target)
-        return f"(/lesson/{int(num.group(1))})" if num else m.group(0)
+        num = re.match(r"(\d\d)-([\w-]+)\.md(#[\w-]*)?", target)
+        if not num:
+            return m.group(0)
+        fragment = num.group(3) or ""
+        return f"(/lesson/{int(num.group(1))}{fragment})"
 
-    text = re.sub(r"\((\d\d-[\w-]+\.md[^)]*)\)", fix_link, text)
-    html = md.markdown(text, extensions=["fenced_code", "tables"])
+    text = re.sub(r"\((\d\d-[\w-]+\.md(?:#[\w-]*)?)\)", fix_link, text)
+    html = md.markdown(text, extensions=["fenced_code", "tables", "toc"])
     html = html.replace("<pre>", "<pre class='codeblock'>")
 
     code = code_file_for(n)
