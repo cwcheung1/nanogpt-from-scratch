@@ -30,6 +30,7 @@ LESSONS_DIR = REPO_ROOT / "lessons"
 CODE_DIR = LESSONS_DIR / "code"
 QNA_DIR = Path(__file__).resolve().parent / "qna_data"
 QNA_DIR.mkdir(exist_ok=True)
+STATIC_DIR = Path(__file__).resolve().parent / "static"
 
 SECRETS_FILE = Path.home() / ".config" / "secrets" / "secrets.env"
 
@@ -290,8 +291,14 @@ def index():
     )
     roadmap = LESSONS_DIR / "00-roadmap.md"
     roadmap_item = f"<li><a href='/lesson/0'>{roadmap.stem}</a></li>" if roadmap.exists() else ""
-    body = f"<div class='content-wrap'><h1>nanogpt-from-scratch</h1><ul class='lessons'>{roadmap_item}{items}</ul></div>"
+    visual_item = "<li><a href='/visual/params-kv'>&#129518; visual: counting params &amp; KV cache</a></li>"
+    body = f"<div class='content-wrap'><h1>nanogpt-from-scratch</h1><ul class='lessons'>{roadmap_item}{items}{visual_item}</ul></div>"
     return page("Lessons", body)
+
+
+@app.get("/visual/params-kv", response_class=HTMLResponse)
+def visual_params_kv():
+    return (STATIC_DIR / "visual-params-kv.html").read_text()
 
 
 @app.get("/lesson/{n}", response_class=HTMLResponse)
@@ -316,7 +323,12 @@ def lesson(n: int):
 
     code = code_file_for(n)
     nav = "<div class='nav'><a href='/'>&larr; all lessons</a></div>"
-    top_pane = f"<div class='content-wrap'>{nav}{html}{code_files_html(n)}{qna_html(n)}</div>"
+    visual_banner = (
+        "<p><a href='/visual/params-kv' class='runbtn' style='display:inline-block;width:auto;padding:0.6rem 1rem;'>"
+        "&#129518; Visual: counting these params &amp; KV cache</a></p>"
+        if n == 6 else ""
+    )
+    top_pane = f"<div class='content-wrap'>{nav}{html}{visual_banner}{code_files_html(n)}{qna_html(n)}</div>"
 
     if code:
         bottom_pane = f"""

@@ -1,0 +1,621 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Counting a GPT</title>
+
+<style>
+  :root {
+    --bg: #0a0e1a;
+    --surface: #121a2b;
+    --surface-2: #182238;
+    --blue: #6a9bff;
+    --blue-dim: #3a548f;
+    --amber: #f2ac66;
+    --amber-dim: #8f6a3d;
+    --violet: #c398ff;
+    --violet-dim: #6f4f96;
+    --text: #eaeef7;
+    --text-dim: #9aa6c0;
+    --grid-line: #2a3550;
+    --good: #6fd6a0;
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", Menlo, Consolas, monospace;
+    --sans: -apple-system, "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+    color-scheme: dark;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f4f6fb;
+      --surface: #ffffff;
+      --surface-2: #eef1f9;
+      --blue: #2f5fc4;
+      --blue-dim: #b9caf0;
+      --amber: #b56a12;
+      --amber-dim: #f0d3ac;
+      --violet: #7c3fc9;
+      --violet-dim: #ddc4f5;
+      --text: #131a2b;
+      --text-dim: #56607a;
+      --grid-line: #d8deec;
+      --good: #1f8f5c;
+      color-scheme: light;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0a0e1a; --surface: #121a2b; --surface-2: #182238;
+    --blue: #6a9bff; --blue-dim: #3a548f; --amber: #f2ac66; --amber-dim: #8f6a3d;
+    --violet: #c398ff; --violet-dim: #6f4f96; --text: #eaeef7; --text-dim: #9aa6c0;
+    --grid-line: #2a3550; --good: #6fd6a0; color-scheme: dark;
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6fb; --surface: #ffffff; --surface-2: #eef1f9;
+    --blue: #2f5fc4; --blue-dim: #b9caf0; --amber: #b56a12; --amber-dim: #f0d3ac;
+    --violet: #7c3fc9; --violet-dim: #ddc4f5; --text: #131a2b; --text-dim: #56607a;
+    --grid-line: #d8deec; --good: #1f8f5c; color-scheme: light;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection { background: var(--blue-dim); }
+
+  .wrap { max-width: 860px; margin: 0 auto; padding: 0 20px 120px; }
+
+  header.hero {
+    padding: 64px 20px 40px;
+    text-align: left;
+    max-width: 860px;
+    margin: 0 auto;
+  }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 13px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--blue);
+    margin: 0 0 14px;
+  }
+  h1 {
+    font-size: clamp(32px, 6vw, 52px);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1.05;
+    margin: 0 0 18px;
+    text-wrap: balance;
+  }
+  .hero p.lede {
+    font-size: clamp(16px, 2.4vw, 19px);
+    color: var(--text-dim);
+    max-width: 62ch;
+    margin: 0;
+  }
+  .hero .bignum {
+    font-family: var(--mono);
+    color: var(--blue);
+  }
+
+  section { padding: 56px 0; border-top: 1px solid var(--grid-line); }
+  section:first-of-type { border-top: none; }
+  section > .prose { max-width: 62ch; }
+
+  h2 {
+    font-size: clamp(22px, 3.4vw, 28px);
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    margin: 0 0 14px;
+    text-wrap: balance;
+  }
+  h3 {
+    font-family: var(--mono);
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-dim);
+    font-weight: 600;
+    margin: 0 0 10px;
+  }
+  p { margin: 0 0 14px; color: var(--text); }
+  p.dim { color: var(--text-dim); }
+  .prose p:last-child { margin-bottom: 0; }
+
+  code, .num {
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+  }
+  .tag {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 2px 8px;
+    border-radius: 5px;
+    border: 1px solid currentColor;
+  }
+
+  /* ---- grid visuals ---- */
+  .visual-card {
+    background: var(--surface);
+    border: 1px solid var(--grid-line);
+    border-radius: 14px;
+    padding: 22px;
+    margin: 20px 0;
+    overflow-x: auto;
+  }
+  .visual-scroll { overflow-x: auto; padding-bottom: 4px; }
+  .matrix-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 20px;
+    flex-wrap: nowrap;
+    min-width: min-content;
+  }
+  .matrix-box {
+    position: relative;
+    border-radius: 6px;
+    flex: none;
+    background-image:
+      repeating-linear-gradient(90deg, rgba(255,255,255,0.09) 0 1px, transparent 1px 8px),
+      repeating-linear-gradient(0deg, rgba(255,255,255,0.09) 0 1px, transparent 1px 8px);
+  }
+  @media (prefers-color-scheme: light) {
+    .matrix-box {
+      background-image:
+        repeating-linear-gradient(90deg, rgba(0,0,0,0.07) 0 1px, transparent 1px 8px),
+        repeating-linear-gradient(0deg, rgba(0,0,0,0.07) 0 1px, transparent 1px 8px);
+    }
+  }
+  :root[data-theme="light"] .matrix-box {
+    background-image:
+      repeating-linear-gradient(90deg, rgba(0,0,0,0.07) 0 1px, transparent 1px 8px),
+      repeating-linear-gradient(0deg, rgba(0,0,0,0.07) 0 1px, transparent 1px 8px);
+  }
+  :root[data-theme="dark"] .matrix-box {
+    background-image:
+      repeating-linear-gradient(90deg, rgba(255,255,255,0.09) 0 1px, transparent 1px 8px),
+      repeating-linear-gradient(0deg, rgba(255,255,255,0.09) 0 1px, transparent 1px 8px);
+  }
+  .matrix-box.blue { background-color: color-mix(in srgb, var(--blue) 28%, var(--surface)); border: 1px solid var(--blue); }
+  .matrix-box.amber { background-color: color-mix(in srgb, var(--amber) 28%, var(--surface)); border: 1px solid var(--amber); }
+  .matrix-box.violet { background-color: color-mix(in srgb, var(--violet) 28%, var(--surface)); border: 1px solid var(--violet); }
+  .matrix-label {
+    margin-top: 8px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-dim);
+    text-align: center;
+    white-space: nowrap;
+  }
+  .matrix-label b { color: var(--text); font-weight: 600; }
+  .matrix-col { display: flex; flex-direction: column; align-items: center; flex: none; }
+  .op { font-family: var(--mono); color: var(--text-dim); font-size: 20px; padding-bottom: 26px; flex: none; }
+
+  .subtotal-line {
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-family: var(--mono); font-size: 14px; color: var(--text-dim);
+    border-top: 1px dashed var(--grid-line); margin-top: 18px; padding-top: 12px;
+  }
+  .subtotal-line b { color: var(--text); font-size: 16px; }
+
+  /* running total */
+  .running-total {
+    position: sticky; top: 12px; z-index: 5;
+    display: flex; justify-content: space-between; align-items: center;
+    background: var(--surface); border: 1px solid var(--grid-line);
+    border-radius: 12px; padding: 12px 18px; margin: 22px 0 0;
+    font-family: var(--mono); font-size: 14px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+  }
+  :root[data-theme="light"] .running-total,
+  @media (prefers-color-scheme: light) { .running-total { box-shadow: 0 8px 24px rgba(20,30,60,0.08); } }
+  .running-total .val { font-size: 20px; font-weight: 700; color: var(--blue); }
+
+  .stack-repeat {
+    display: flex; flex-direction: column; align-items: center; gap: 6px; margin: 18px 0;
+  }
+  .stack-layer {
+    width: 100%; max-width: 420px; height: 14px; border-radius: 4px;
+    background: linear-gradient(90deg, var(--blue-dim), var(--amber-dim), var(--violet-dim));
+    opacity: 0.55;
+  }
+  .stack-layer:last-child { opacity: 1; }
+  .stack-caption { font-family: var(--mono); font-size: 13px; color: var(--text-dim); margin-top: 4px; }
+
+  .final-total {
+    text-align: center; padding: 40px 20px;
+    background: var(--surface); border: 1px solid var(--blue); border-radius: 16px;
+  }
+  .final-total .n {
+    font-family: var(--mono); font-size: clamp(34px, 7vw, 56px); font-weight: 800;
+    color: var(--blue); display: block;
+  }
+  .final-total .cap { color: var(--text-dim); font-size: 14px; margin-top: 8px; }
+
+  /* KV cache interactive */
+  .kv-panel {
+    background: var(--surface); border: 1px solid var(--grid-line);
+    border-radius: 14px; padding: 24px;
+  }
+  .kv-controls { display: grid; gap: 20px; margin-bottom: 24px; }
+  .control label {
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-family: var(--mono); font-size: 13px; color: var(--text-dim); margin-bottom: 6px;
+  }
+  .control label .v { color: var(--text); font-weight: 700; font-size: 14px; }
+  input[type="range"] {
+    width: 100%; accent-color: var(--blue); height: 22px;
+  }
+  input[type="range"]:focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; }
+  .preset-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .preset-btn {
+    font-family: var(--mono); font-size: 12.5px; padding: 7px 12px;
+    border-radius: 8px; border: 1px solid var(--grid-line); background: var(--surface-2);
+    color: var(--text); cursor: pointer;
+  }
+  .preset-btn.active { border-color: var(--blue); color: var(--blue); background: color-mix(in srgb, var(--blue) 12%, var(--surface-2)); }
+  .preset-btn:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+
+  .kv-visual {
+    display: flex; align-items: flex-end; gap: 3px; height: 160px;
+    padding: 12px; border-radius: 10px; background: var(--surface-2);
+    overflow: hidden; margin-bottom: 18px;
+  }
+  .kv-bar {
+    flex: 1; min-width: 3px; border-radius: 2px 2px 0 0;
+    background: linear-gradient(180deg, var(--blue), var(--violet));
+    transition: height 0.15s ease;
+  }
+  @media (prefers-reduced-motion: reduce) { .kv-bar { transition: none; } }
+
+  .kv-readout {
+    display: flex; justify-content: space-between; align-items: baseline;
+    flex-wrap: wrap; gap: 10px;
+    border-top: 1px solid var(--grid-line); padding-top: 16px;
+  }
+  .kv-readout .label { color: var(--text-dim); font-size: 13px; }
+  .kv-readout .value {
+    font-family: var(--mono); font-size: clamp(26px, 5vw, 38px); font-weight: 800; color: var(--amber);
+  }
+  .kv-formula {
+    font-family: var(--mono); font-size: 13px; color: var(--text-dim);
+    background: var(--surface-2); border-radius: 8px; padding: 12px 14px; margin-top: 16px;
+    overflow-x: auto; white-space: nowrap;
+  }
+  .kv-formula .hi { color: var(--text); font-weight: 600; }
+
+  a { color: var(--blue); }
+  footer {
+    max-width: 860px; margin: 0 auto; padding: 40px 20px 0;
+    color: var(--text-dim); font-size: 13px;
+  }
+
+  @media (max-width: 560px) {
+    header.hero { padding: 40px 16px 28px; }
+    .wrap { padding: 0 16px 100px; }
+    .op { padding-bottom: 18px; font-size: 16px; }
+  }
+</style>
+</head>
+<body>
+<header class="hero">
+  <p class="eyebrow">nanogpt-from-scratch &middot; lesson 6, visualized</p>
+  <h1>Every weight is a cell in a grid.</h1>
+  <p class="lede">Let's count all <span class="bignum">10,788,929</span> of them, block by block &mdash; then figure out how much memory it takes for a running model to remember what it's already read.</p>
+</header>
+
+<div class="wrap">
+
+  <section id="what-is-a-param">
+    <div class="prose">
+      <h3>First, the smallest possible case</h3>
+      <h2>A parameter is one number in a grid</h2>
+      <p>A <code>Linear</code> layer connecting 4 inputs to 8 outputs needs one learnable number for every input&ndash;output pair &mdash; a 4&times;8 grid of connections. Every cell you see below is one parameter.</p>
+    </div>
+    <div class="visual-card">
+      <div class="visual-scroll">
+        <div class="matrix-col">
+          <div class="matrix-box blue" style="width:224px;height:112px;"></div>
+          <div class="matrix-label"><b>4 &times; 8</b> = 32 parameters</div>
+        </div>
+      </div>
+    </div>
+    <div class="prose">
+      <p class="dim">The real model below is the same idea, just with much bigger grids &mdash; a few hundred to a couple thousand units on a side instead of 4 or 8. We'll size each grid roughly to scale, so you can <em>see</em> which pieces of a GPT actually hold most of its numbers.</p>
+    </div>
+  </section>
+
+  <section id="build">
+    <div class="prose">
+      <h3>lessons/code/06_full_gpt_and_training.py</h3>
+      <h2>Building the real model, piece by piece</h2>
+      <p>This is lesson 6's actual configuration: <code>n_embd=384</code>, <code>n_head=6</code>, <code>n_layer=6</code>, <code>vocab_size=65</code>, <code>block_size=256</code>. Every number below is the real, verified count &mdash; it matches exactly what <code>sum(p.numel() for p in model.parameters())</code> prints when you run it.</p>
+    </div>
+
+    <div class="running-total">
+      <span>running total</span>
+      <span class="val num" id="rt">0</span>
+    </div>
+
+    <h3 style="margin-top:32px;">Token embedding</h3>
+    <div class="visual-card">
+      <div class="visual-scroll">
+        <div class="matrix-col">
+          <div class="matrix-box violet" style="width:107px;height:18px;"></div>
+          <div class="matrix-label">65 characters &times; <b>384</b> numbers each</div>
+        </div>
+      </div>
+      <div class="subtotal-line"><span>65 &times; 384</span><b class="num">24,960</b></div>
+    </div>
+
+    <h3>Position embedding</h3>
+    <div class="visual-card">
+      <div class="visual-scroll">
+        <div class="matrix-col">
+          <div class="matrix-box violet" style="width:107px;height:72px;"></div>
+          <div class="matrix-label">256 positions &times; <b>384</b> numbers each</div>
+        </div>
+      </div>
+      <div class="subtotal-line"><span>256 &times; 384</span><b class="num">98,304</b></div>
+    </div>
+
+    <div class="prose" style="margin-top:32px;">
+      <h3>Inside ONE transformer block</h3>
+      <p class="dim">This whole section repeats <b>6 times</b> (<code>n_layer=6</code>) &mdash; count it once, then multiply.</p>
+    </div>
+
+    <h3>Attention: key, query, value</h3>
+    <div class="visual-card">
+      <div class="visual-scroll">
+        <div class="matrix-row">
+          <div class="matrix-col"><div class="matrix-box blue" style="width:107px;height:107px;"></div><div class="matrix-label">key<br><b>384&times;384</b></div></div>
+          <div class="op">+</div>
+          <div class="matrix-col"><div class="matrix-box amber" style="width:107px;height:107px;"></div><div class="matrix-label">query<br><b>384&times;384</b></div></div>
+          <div class="op">+</div>
+          <div class="matrix-col"><div class="matrix-box violet" style="width:107px;height:107px;"></div><div class="matrix-label">value<br><b>384&times;384</b></div></div>
+        </div>
+      </div>
+      <div class="subtotal-line"><span>3 &times; (384 &times; 384), no bias, split across all 6 heads</span><b class="num">442,368</b></div>
+    </div>
+
+    <h3>Attention output projection</h3>
+    <div class="visual-card">
+      <div class="visual-scroll">
+        <div class="matrix-col">
+          <div class="matrix-box blue" style="width:107px;height:107px;"></div>
+          <div class="matrix-label">384 &times; 384, + 384 bias</div>
+        </div>
+      </div>
+      <div class="subtotal-line"><span>merges the 6 heads' outputs back to width 384</span><b class="num">147,840</b></div>
+    </div>
+
+    <h3>MLP &mdash; the "thinking" step</h3>
+    <div class="visual-card">
+      <div class="visual-scroll">
+        <div class="matrix-row">
+          <div class="matrix-col"><div class="matrix-box amber" style="width:430px;height:107px;"></div><div class="matrix-label">expand: 384 &rarr; <b>1536</b></div></div>
+          <div class="op">&rarr;</div>
+          <div class="matrix-col"><div class="matrix-box amber" style="width:107px;height:430px;"></div><div class="matrix-label">contract:<br>1536 &rarr; <b>384</b></div></div>
+        </div>
+      </div>
+      <div class="subtotal-line"><span>the 4&times; widen-then-narrow from lesson 5</span><b class="num">1,181,568</b></div>
+    </div>
+
+    <h3>2&times; LayerNorm</h3>
+    <div class="visual-card">
+      <div class="visual-scroll">
+        <div class="matrix-row">
+          <div class="matrix-col"><div class="matrix-box violet" style="width:107px;height:6px;"></div><div class="matrix-label">ln1</div></div>
+          <div class="matrix-col"><div class="matrix-box violet" style="width:107px;height:6px;"></div><div class="matrix-label">ln2</div></div>
+        </div>
+      </div>
+      <div class="subtotal-line"><span>2 &times; (384 weight + 384 bias) &mdash; tiny, next to everything else</span><b class="num">1,536</b></div>
+    </div>
+
+    <div class="visual-card" style="border-color:var(--blue);">
+      <div class="subtotal-line" style="margin-top:0;padding-top:0;border-top:none;">
+        <span>one block, total</span><b class="num">1,773,312</b>
+      </div>
+    </div>
+
+    <div class="stack-repeat">
+      <div class="stack-layer"></div>
+      <div class="stack-layer"></div>
+      <div class="stack-layer"></div>
+      <div class="stack-layer"></div>
+      <div class="stack-layer"></div>
+      <div class="stack-layer"></div>
+      <div class="stack-caption">&times; 6 identical blocks, stacked (<code>n_layer=6</code>) &mdash; each with its own separately-learned numbers</div>
+    </div>
+    <div class="visual-card">
+      <div class="subtotal-line" style="margin-top:0;padding-top:0;border-top:none;">
+        <span>1,773,312 &times; 6</span><b class="num">10,639,872</b>
+      </div>
+    </div>
+
+    <h3>Final LayerNorm + output head</h3>
+    <div class="visual-card">
+      <div class="visual-scroll">
+        <div class="matrix-row">
+          <div class="matrix-col"><div class="matrix-box violet" style="width:107px;height:6px;"></div><div class="matrix-label">ln_f</div></div>
+          <div class="matrix-col"><div class="matrix-box blue" style="width:107px;height:18px;"></div><div class="matrix-label">384 &rarr; 65<br>logits</div></div>
+        </div>
+      </div>
+      <div class="subtotal-line"><span>768 + 25,025</span><b class="num">25,793</b></div>
+    </div>
+
+    <div class="final-total" style="margin-top:36px;">
+      <span class="n num" id="final-num">10,788,929</span>
+      <span class="cap">total learnable numbers &mdash; matches the real printed value exactly</span>
+    </div>
+  </section>
+
+  <section id="kv-cache">
+    <div class="prose">
+      <h3>Inference, not training</h3>
+      <h2>How much memory to remember what's already been read?</h2>
+      <p>Generating text one character at a time, the model would normally recompute every earlier position's key &amp; value vectors on every single step &mdash; the exact waste lesson 2's bigram model flagged. Real serving avoids that: compute each position's key/value <em>once</em>, cache it, and just append as new tokens arrive.</p>
+      <p class="dim">Drag the sliders. The bars and the number below update live &mdash; watch how directly memory scales with context length and concurrent users.</p>
+    </div>
+
+    <div class="kv-panel">
+      <div class="preset-row" style="margin-bottom:18px;" role="group" aria-label="Model size preset">
+        <button class="preset-btn active" data-preset="toy" type="button">this repo's model (6 layers, 384 wide)</button>
+        <button class="preset-btn" data-preset="big" type="button">7B-class model (32 layers, 4096 wide)</button>
+      </div>
+
+      <div class="kv-controls">
+        <div class="control">
+          <label for="ctx">context length (tokens so far) <span class="v" id="ctx-v">256</span></label>
+          <input type="range" id="ctx" min="1" max="256" value="256" step="1">
+        </div>
+        <div class="control">
+          <label for="batch">concurrent users <span class="v" id="batch-v">1</span></label>
+          <input type="range" id="batch" min="1" max="64" value="1" step="1">
+        </div>
+        <div class="control">
+          <label for="prec">precision <span class="v" id="prec-v">fp32 (4 bytes)</span></label>
+          <input type="range" id="prec" min="0" max="1" value="0" step="1">
+        </div>
+      </div>
+
+      <div class="kv-visual" id="kv-visual" aria-hidden="true"></div>
+
+      <div class="kv-readout">
+        <span class="label">total KV cache, all layers, all users</span>
+        <span class="value num" id="kv-total">4.5 MB</span>
+      </div>
+
+      <div class="kv-formula">
+        2 &times; <span class="hi" id="f-layer">6</span> layers &times; <span class="hi" id="f-batch">1</span> users &times; <span class="hi" id="f-ctx">256</span> tokens &times; <span class="hi" id="f-embd">384</span> width &times; <span class="hi" id="f-bytes">4</span> bytes
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<footer>
+  <p>Verified against the actual repo: parameter formula cross-checked line-for-line against <code>model.parameters()</code> on the real <code>GPTLanguageModel</code>; KV cache formula is the standard <code>2 &times; n_layer &times; batch &times; T &times; n_embd</code> (n_head &times; head_size cancels out to n_embd, so head count doesn't change the total). &larr; back to <a href="/">the lesson viewer</a>.</p>
+</footer>
+
+<script>
+(function () {
+  // running total ticker for the build-up section
+  var subtotals = [24960, 98304, 10639872, 768, 25025];
+  var target = subtotals.reduce(function (a, b) { return a + b; }, 0);
+  var rt = document.getElementById('rt');
+  var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function formatNum(n) { return Math.round(n).toLocaleString('en-US'); }
+
+  if (reduceMotion) {
+    rt.textContent = formatNum(target);
+  } else {
+    var obs = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting) {
+          var start = null;
+          var dur = 900;
+          function step(ts) {
+            if (!start) start = ts;
+            var p = Math.min(1, (ts - start) / dur);
+            rt.textContent = formatNum(target * p);
+            if (p < 1) requestAnimationFrame(step);
+          }
+          requestAnimationFrame(step);
+          obs.disconnect();
+        }
+      });
+    }, { threshold: 0.5 });
+    obs.observe(document.getElementById('build'));
+  }
+
+  // KV cache interactive
+  var ctx = document.getElementById('ctx');
+  var batch = document.getElementById('batch');
+  var prec = document.getElementById('prec');
+  var ctxV = document.getElementById('ctx-v');
+  var batchV = document.getElementById('batch-v');
+  var precV = document.getElementById('prec-v');
+  var kvTotal = document.getElementById('kv-total');
+  var kvVisual = document.getElementById('kv-visual');
+  var fLayer = document.getElementById('f-layer');
+  var fBatch = document.getElementById('f-batch');
+  var fCtx = document.getElementById('f-ctx');
+  var fEmbd = document.getElementById('f-embd');
+  var fBytes = document.getElementById('f-bytes');
+  var buttons = document.querySelectorAll('.preset-btn');
+
+  var presets = {
+    toy: { n_layer: 6, n_embd: 384, ctxMax: 256, label: '6 layers, 384 wide' },
+    big: { n_layer: 32, n_embd: 4096, ctxMax: 32768, label: '32 layers, 4096 wide' }
+  };
+  var current = 'toy';
+
+  function fmtBytes(bytes) {
+    if (bytes < 1024) return bytes.toFixed(0) + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
+  }
+
+  function renderBars(T, maxT) {
+    kvVisual.innerHTML = '';
+    var barCount = 48;
+    var filled = Math.max(1, Math.round((T / maxT) * barCount));
+    for (var i = 0; i < barCount; i++) {
+      var bar = document.createElement('div');
+      bar.className = 'kv-bar';
+      var h = i < filled ? (20 + (i / barCount) * 80) : 6;
+      bar.style.height = h + '%';
+      bar.style.opacity = i < filled ? '1' : '0.18';
+      kvVisual.appendChild(bar);
+    }
+  }
+
+  function update() {
+    var p = presets[current];
+    var T = parseInt(ctx.value, 10);
+    var b = parseInt(batch.value, 10);
+    var bytesPerElem = prec.value === '0' ? 4 : 2;
+
+    ctxV.textContent = T.toLocaleString('en-US');
+    batchV.textContent = b;
+    precV.textContent = bytesPerElem === 4 ? 'fp32 (4 bytes)' : 'bf16 (2 bytes)';
+
+    var elements = 2 * p.n_layer * b * T * p.n_embd;
+    var bytes = elements * bytesPerElem;
+    kvTotal.textContent = fmtBytes(bytes);
+
+    fLayer.textContent = p.n_layer;
+    fBatch.textContent = b;
+    fCtx.textContent = T.toLocaleString('en-US');
+    fEmbd.textContent = p.n_embd;
+    fBytes.textContent = bytesPerElem;
+
+    renderBars(T, p.ctxMax);
+  }
+
+  buttons.forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      buttons.forEach(function (b2) { b2.classList.remove('active'); });
+      btn.classList.add('active');
+      current = btn.getAttribute('data-preset');
+      var p = presets[current];
+      ctx.max = p.ctxMax;
+      ctx.value = p.ctxMax;
+      update();
+    });
+  });
+
+  [ctx, batch, prec].forEach(function (el) { el.addEventListener('input', update); });
+  update();
+})();
+</script>
+
+</body>
+</html>
